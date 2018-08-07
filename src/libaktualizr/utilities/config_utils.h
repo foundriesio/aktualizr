@@ -164,7 +164,8 @@ class BaseConfig {
     }
   }
 
-  std::vector<boost::filesystem::path> config_dirs_ = {"/usr/lib/sota/conf.d", "/etc/sota/conf.d/"};
+  std::vector<boost::filesystem::path> config_dirs_ = {"/usr/lib/sota/conf.d", "/var/sota/sota.toml",
+                                                       "/etc/sota/conf.d/"};
 };
 
 #endif  // CONFIG_UTILS_H_
