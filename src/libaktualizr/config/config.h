@@ -51,7 +51,7 @@ struct ProvisionConfig {
 };
 
 struct UptaneConfig {
-  uint64_t polling_sec{10U};
+  uint64_t polling_sec{300U};
   std::string director_server;
   std::string repo_server;
   CryptoSource key_source{CryptoSource::kFile};
@@ -101,7 +101,8 @@ class Config : public BaseConfig {
   void updateFromPropertyTree(const boost::property_tree::ptree& pt) override;
   void updateFromCommandLine(const boost::program_options::variables_map& cmd);
 
-  std::vector<boost::filesystem::path> config_dirs_ = {"/usr/lib/sota/conf.d", "/etc/sota/conf.d/"};
+  std::vector<boost::filesystem::path> config_dirs_ = {"/usr/lib/sota/conf.d", "/var/sota/sota.toml",
+                                                       "/etc/sota/conf.d/"};
   bool loglevel_from_cmdline{false};
 };
 
