@@ -5,24 +5,51 @@
 
 #include "package_manager/ostreemanager.h"
 
-static void finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
+#ifdef BUILD_DOCKERAPP
+static void add_apps_header(std::vector<std::string> &headers, PackageConfig &config) {
+  if (config.type == PackageManager::kOstreeDockerApp) {
+    headers.emplace_back("x-ats-dockerapps: " + boost::algorithm::join(config.docker_apps, ","));
+  }
+}
+#else
+#define add_apps_header(headers, config) \
+  {}
+#endif
+
+static Uptane::Target finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
   boost::optional<Uptane::Target> pending_version;
   storage.loadInstalledVersions("", nullptr, &pending_version);
 
-  if (!!pending_version) {
-    GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.sysroot);
-    OstreeDeployment *booted_deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
-    if (booted_deployment == nullptr) {
-      throw std::runtime_error("Could not get booted deployment in " + config.sysroot.string());
-    }
-    std::string current_hash = ostree_deployment_get_csum(booted_deployment);
+  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.sysroot);
+  OstreeDeployment *booted_deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+  std::string current_hash = ostree_deployment_get_csum(booted_deployment);
+  if (booted_deployment == nullptr) {
+    throw std::runtime_error("Could not get booted deployment in " + config.sysroot.string());
+  }
 
+  if (!!pending_version) {
     const Uptane::Target &target = *pending_version;
     if (current_hash == target.sha256Hash()) {
       LOG_INFO << "Marking target install complete for: " << target;
       storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kCurrent);
+      return target;
     }
   }
+
+  std::vector<Uptane::Target> installed_versions;
+  storage.loadPrimaryInstallationLog(&installed_versions, false);
+
+  // Version should be in installed versions. Its possible that multiple
+  // targets could have the same sha256Hash. In this case the safest assumption
+  // is that the most recent (the reverse of the vector) target is what we
+  // should return.
+  std::vector<Uptane::Target>::reverse_iterator it;
+  for (it = installed_versions.rbegin(); it != installed_versions.rend(); it++) {
+    if (it->sha256Hash() == current_hash) {
+      return *it;
+    }
+  }
+  return Uptane::Target::Unknown();
 }
 
 LiteClient::LiteClient(Config &config_in)
@@ -48,14 +75,36 @@ LiteClient::LiteClient(Config &config_in)
   }
   primary_ecu = ecu_serials[0];
 
-  auto http_client = std::make_shared<HttpClient>();
+  std::vector<std::string> headers;
+  GObjectUniquePtr<OstreeSysroot> sysroot_smart = OstreeManager::LoadSysroot(config.pacman.sysroot);
+  OstreeDeployment *deployment = ostree_sysroot_get_booted_deployment(sysroot_smart.get());
+  std::string header("x-ats-ostreehash: ");
+  if (deployment != nullptr) {
+    header += ostree_deployment_get_csum(deployment);
+  } else {
+    header += "?";
+  }
+  headers.push_back(header);
+  add_apps_header(headers, config.pacman);
+
+  Uptane::Target tgt = finalizeIfNeeded(*storage, config.pacman);
+  headers.emplace_back("x-ats-target: " + tgt.filename());
+
+  if (!config.telemetry.report_network) {
+    // Provide the random primary ECU serial so our backend will have some
+    // idea of the number of unique devices using the system
+    headers.emplace_back("x-ats-primary: " + primary_ecu.first.ToString());
+  }
+
+  headers.emplace_back("x-ats-tags: " + boost::algorithm::join(config.pacman.tags, ","));
+
+  auto http_client = std::make_shared<HttpClient>(&headers);
 
   KeyManager keys(storage, config.keymanagerConfig());
   keys.copyCertsToCurl(*http_client);
 
   primary = std::make_shared<SotaUptaneClient>(config, storage, http_client);
   primary->initializePrimaryEcu();
-  finalizeIfNeeded(*storage, config.pacman);
 }
 
 bool target_has_tags(const Uptane::Target &t, const std::vector<std::string> &config_tags) {
