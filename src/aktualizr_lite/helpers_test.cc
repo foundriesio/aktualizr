@@ -51,6 +51,37 @@ TEST(helpers, lite_client_finalize) {
   ASSERT_FALSE(target.MatchHash(LiteClient(config).primary->getCurrent().hashes()[0]));
 }
 
+TEST(helpers, target_has_tags) {
+  auto t = Uptane::Target::Unknown();
+
+  // No tags defined in target:
+  std::vector<std::string> config_tags;
+  ASSERT_TRUE(target_has_tags(t, config_tags));
+  config_tags.push_back("foo");
+  ASSERT_FALSE(target_has_tags(t, config_tags));
+
+  // Set target tags to: premerge, qa
+  auto custom = t.custom_data();
+  custom["tags"].append("premerge");
+  custom["tags"].append("qa");
+  t.updateCustom(custom);
+
+  config_tags.clear();
+  ASSERT_TRUE(target_has_tags(t, config_tags));
+
+  config_tags.push_back("qa");
+  config_tags.push_back("blah");
+  ASSERT_TRUE(target_has_tags(t, config_tags));
+
+  config_tags.clear();
+  config_tags.push_back("premerge");
+  ASSERT_TRUE(target_has_tags(t, config_tags));
+
+  config_tags.clear();
+  config_tags.push_back("foo");
+  ASSERT_FALSE(target_has_tags(t, config_tags));
+}
+
 #ifndef __NO_MAIN__
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

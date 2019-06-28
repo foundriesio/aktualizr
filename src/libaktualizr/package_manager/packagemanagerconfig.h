@@ -20,6 +20,7 @@ struct PackageConfig {
   boost::filesystem::path sysroot;
   std::string ostree_server;
   boost::filesystem::path packages_file{"/usr/package.manifest"};
+  std::vector<std::string> tags;
 
 #ifdef BUILD_DOCKERAPP
   std::vector<std::string> docker_apps;
