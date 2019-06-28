@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "primary/sotauptaneclient.h"
+#include "uptane/tuf.h"
 
 struct Version {
   std::string raw_ver;
@@ -22,5 +23,7 @@ struct LiteClient {
   std::shared_ptr<SotaUptaneClient> primary;
   std::pair<Uptane::EcuSerial, Uptane::HardwareIdentifier> primary_ecu;
 };
+
+bool target_has_tags(const Uptane::Target& t, const std::vector<std::string>& config_tags);
 
 #endif  // AKTUALIZR_LITE_HELPERS
