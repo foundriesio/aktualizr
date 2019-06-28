@@ -70,16 +70,16 @@ repo_server = "http://localhost:$port/repo/repo"
 [provision]
 primary_ecu_hardware_id = "hwid-for-test"
 
-[pacman]
-type = "ostree"
-sysroot = "$OSTREE_SYSROOT"
-os = "dummy-os"
-
 [storage]
 type = "sqlite"
 path = "$sota_dir"
 sqldb_path = "sql.db"
 uptane_metadata_path = "$sota_dir/metadata"
+
+[pacman]
+type = "ostree"
+sysroot = "$OSTREE_SYSROOT"
+os = "dummy-os"
 EOF
 
 ## Check that we can do the info command
@@ -114,3 +114,8 @@ if [[ ! "$out" =~ "Active image is: zlast	sha256:$sha" ]] ; then
     echo $out
     exit 1
 fi
+
+## Make sure we obey tags
+echo 'tags = "promoted"' >> $sota_dir/sota.toml
+cd /tmp/
+OSTREE_HASH=$sha LD_PRELOAD=$mock_ostree $valgrind $aklite --loglevel 1 -c $sota_dir/sota.toml update | grep "Already up-to-date"
