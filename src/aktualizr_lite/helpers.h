@@ -24,5 +24,6 @@ struct LiteClient {
 };
 
 bool target_has_tags(const Uptane::Target& t, const std::vector<std::string>& config_tags);
+bool targets_eq(const Uptane::Target& t1, const Uptane::Target& t2, bool compareDockerApps);
 
 #endif  // AKTUALIZR_LITE_HELPERS
