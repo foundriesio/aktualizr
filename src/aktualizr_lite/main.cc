@@ -11,6 +11,13 @@
 
 namespace bpo = boost::program_options;
 
+#ifdef BUILD_DOCKERAPP
+#define should_compare_docker_apps(config) \
+  (config.pacman.type == PackageManager::kOstreeDockerApp && !config.pacman.docker_apps.empty())
+#else
+#define should_compare_docker_apps(config) (false)
+#endif
+
 static void log_info_target(const std::string &prefix, const Config &config, const Uptane::Target &t) {
   auto name = t.filename();
   if (t.custom_version().length() > 0) {
@@ -155,6 +162,41 @@ static int update_main(LiteClient &client, const bpo::variables_map &variables_m
   return do_update(client, *target);
 }
 
+static int daemon_main(LiteClient &client, const bpo::variables_map &variables_map) {
+  if (client.config.uptane.repo_server.empty()) {
+    LOG_ERROR << "[uptane]/repo_server is not configured";
+    return 1;
+  }
+  bool compareDockerApps = should_compare_docker_apps(client.config);
+  Uptane::HardwareIdentifier hwid(client.config.provision.primary_ecu_hardware_id);
+
+  auto current = client.primary->getCurrent();
+  LOG_INFO << "Active image is: " << current;
+
+  uint64_t interval = client.config.uptane.polling_sec;
+  if (variables_map.count("interval") > 0) {
+    interval = variables_map["interval"].as<uint64_t>();
+  }
+
+  while (true) {
+    LOG_INFO << "Refreshing target metadata";
+    if (!client.primary->updateImagesMeta()) {
+      LOG_WARNING << "Unable to update latest metadata";
+      std::this_thread::sleep_for(std::chrono::seconds(10));
+      continue;  // There's no point trying to look for an update
+    }
+    auto target = find_target(client.primary, hwid, client.config.pacman.tags, "latest");
+    if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
+      LOG_INFO << "Updating base image to: " << *target;
+      if (do_update(client, *target) == 0) {
+        // TODO reboot
+      }
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(interval));
+  }
+  return 0;
+}
+
 struct SubCommand {
   const char *name;
   int (*main)(LiteClient &, const bpo::variables_map &);
@@ -163,6 +205,7 @@ static SubCommand commands[] = {
     {"status", status_main},
     {"list", list_main},
     {"update", update_main},
+    {"daemon", daemon_main},
 };
 
 void check_info_options(const bpo::options_description &description, const bpo::variables_map &vm) {
@@ -197,6 +240,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("ostree-server", bpo::value<std::string>(), "url of the ostree repository")
       ("primary-ecu-hardware-id", bpo::value<std::string>(), "hardware ID of primary ecu")
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
+      ("interval", bpo::value<uint64_t>(), "Override uptane.polling_secs interval to poll for update when in daemon mode.")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 
