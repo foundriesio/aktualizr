@@ -167,6 +167,10 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     LOG_ERROR << "[uptane]/repo_server is not configured";
     return 1;
   }
+  if (access(client.config.bootloader.reboot_command.c_str(), X_OK) != 0) {
+    LOG_ERROR << "reboot command: " << client.config.bootloader.reboot_command << " is not executable";
+    return 1;
+  }
   bool compareDockerApps = should_compare_docker_apps(client.config);
   Uptane::HardwareIdentifier hwid(client.config.provision.primary_ecu_hardware_id);
 
@@ -189,7 +193,10 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
       if (do_update(client, *target) == 0) {
-        // TODO reboot
+        if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
+          LOG_ERROR << "Unable to reboot system";
+          return 1;
+        }
       }
     }
     std::this_thread::sleep_for(std::chrono::seconds(interval));
