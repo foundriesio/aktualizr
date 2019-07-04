@@ -1,3 +1,4 @@
+#include <sys/file.h>
 #include <unistd.h>
 #include <iostream>
 
@@ -121,13 +122,32 @@ static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUpt
   throw std::runtime_error("Unable to find update");
 }
 
-static int do_update(LiteClient &client, Uptane::Target &target) {
+static int get_lock(const char *lockfile) {
+  int fd = open(lockfile, O_RDWR | O_CREAT | O_APPEND, 0666);
+  if (fd < 0) {
+    LOG_ERROR << "Unable to open lock file";
+    return -1;
+  }
+  LOG_INFO << "Acquiring lock";
+  if (flock(fd, LOCK_EX) < 0) {
+    LOG_ERROR << "Unable to acquire lock";
+    close(fd);
+    return -1;
+  }
+  return fd;
+}
+
+static int do_update(LiteClient &client, Uptane::Target &target, const char *lockfile) {
   if (!client.primary->downloadImage(target).first) {
     return 1;
   }
 
   if (client.primary->VerifyTarget(target) != TargetStatus::kGood) {
     LOG_ERROR << "Downloaded target is invalid";
+  }
+
+  int lockfd = 0;
+  if (lockfile != nullptr && (lockfd = get_lock(lockfile)) < 0) {
     return 1;
   }
 
@@ -137,8 +157,11 @@ static int do_update(LiteClient &client, Uptane::Target &target) {
     client.storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kPending);
   } else if (iresult.result_code.num_code == data::ResultCode::Numeric::kOk) {
     client.storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kCurrent);
+    close(lockfd);
   } else {
     LOG_ERROR << "Unable to install update: " << iresult.description;
+    // let go of the lock since we couldn't update
+    close(lockfd);
     return 1;
   }
   LOG_INFO << iresult.description;
@@ -159,7 +182,7 @@ static int update_main(LiteClient &client, const bpo::variables_map &variables_m
     return 0;
   }
   LOG_INFO << "Updating to: " << *target;
-  return do_update(client, *target);
+  return do_update(client, *target, nullptr);
 }
 
 static int daemon_main(LiteClient &client, const bpo::variables_map &variables_map) {
@@ -173,6 +196,12 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   }
   bool compareDockerApps = should_compare_docker_apps(client.config);
   Uptane::HardwareIdentifier hwid(client.config.provision.primary_ecu_hardware_id);
+  const char *lockfile = nullptr;
+  boost::filesystem::path lockfilePath;
+  if (variables_map.count("update-lockfile") > 0) {
+    lockfilePath = variables_map["update-lockfile"].as<boost::filesystem::path>();
+    lockfile = lockfilePath.c_str();
+  }
 
   auto current = client.primary->getCurrent();
   LOG_INFO << "Active image is: " << current;
@@ -192,7 +221,7 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     auto target = find_target(client.primary, hwid, client.config.pacman.tags, "latest");
     if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
-      if (do_update(client, *target) == 0) {
+      if (do_update(client, *target, lockfile) == 0) {
         if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
           LOG_ERROR << "Unable to reboot system";
           return 1;
@@ -248,6 +277,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("primary-ecu-hardware-id", bpo::value<std::string>(), "hardware ID of primary ecu")
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
       ("interval", bpo::value<uint64_t>(), "Override uptane.polling_secs interval to poll for update when in daemon mode.")
+      ("update-lockfile", bpo::value<boost::filesystem::path>(), "If provided, an flock(2) is applied to this file before performing an update in daemon mode")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 
