@@ -583,9 +583,11 @@ std::pair<bool, Uptane::Target> SotaUptaneClient::downloadImage(const Uptane::Ta
   // TODO: support downloading encrypted targets from director
 
   const std::string &correlation_id = director_repo.getCorrelationId();
-  // send an event for all ecus that are touched by this target
-  for (const auto &ecu : target.ecus()) {
-    report_queue->enqueue(std_::make_unique<EcuDownloadStartedReport>(ecu.first, correlation_id));
+  if (correlation_id.size() > 0) {
+    // send an event for all ecus that are touched by this target
+    for (const auto &ecu : target.ecus()) {
+      report_queue->enqueue(std_::make_unique<EcuDownloadStartedReport>(ecu.first, correlation_id));
+    }
   }
 
   KeyManager keys(storage, config.keymanagerConfig());
@@ -620,10 +622,12 @@ std::pair<bool, Uptane::Target> SotaUptaneClient::downloadImage(const Uptane::Ta
     success = true;
   }
 
-  // send this asynchronously before `sendEvent`, so that the report timestamp
-  // would not be delayed by callbacks on events
-  for (const auto &ecu : target.ecus()) {
-    report_queue->enqueue(std_::make_unique<EcuDownloadCompletedReport>(ecu.first, correlation_id, success));
+  if (correlation_id.size() > 0) {
+    // send this asynchronously before `sendEvent`, so that the report timestamp
+    // would not be delayed by callbacks on events
+    for (const auto &ecu : target.ecus()) {
+      report_queue->enqueue(std_::make_unique<EcuDownloadCompletedReport>(ecu.first, correlation_id, success));
+    }
   }
 
   sendEvent<event::DownloadTargetComplete>(target, success);
