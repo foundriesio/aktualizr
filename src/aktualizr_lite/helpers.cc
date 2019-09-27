@@ -16,7 +16,7 @@ static void add_apps_header(std::vector<std::string> &headers, PackageConfig &co
   {}
 #endif
 
-static Uptane::Target finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
+static std::pair<bool, Uptane::Target> finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
   boost::optional<Uptane::Target> pending_version;
   storage.loadInstalledVersions("", nullptr, &pending_version);
 
@@ -32,7 +32,7 @@ static Uptane::Target finalizeIfNeeded(INvStorage &storage, PackageConfig &confi
     if (current_hash == target.sha256Hash()) {
       LOG_INFO << "Marking target install complete for: " << target;
       storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kCurrent);
-      return target;
+      return std::make_pair(true, target);
     }
   }
 
@@ -46,13 +46,13 @@ static Uptane::Target finalizeIfNeeded(INvStorage &storage, PackageConfig &confi
   std::vector<Uptane::Target>::reverse_iterator it;
   for (it = installed_versions.rbegin(); it != installed_versions.rend(); it++) {
     if (it->sha256Hash() == current_hash) {
-      return *it;
+      return std::make_pair(false, *it);
     }
   }
-  return Uptane::Target::Unknown();
+  return std::make_pair(false, Uptane::Target::Unknown());
 }
 
-LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)) {
+LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)), primary_serial(Uptane::EcuSerial::Unknown()) {
   std::string pkey;
   storage = INvStorage::newStorage(config.storage);
   storage->importData(config.import);
@@ -69,8 +69,11 @@ LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)) {
       boost::uuids::uuid tmp = boost::uuids::random_generator()();
       serial = boost::uuids::to_string(tmp);
     }
-    ecu_serials.emplace_back(Uptane::EcuSerial(serial), Uptane::HardwareIdentifier(hwid));
+    primary_serial = Uptane::EcuSerial(serial);
+    ecu_serials.emplace_back(primary_serial, Uptane::HardwareIdentifier(hwid));
     storage->storeEcuSerials(ecu_serials);
+  } else {
+    primary_serial = ecu_serials[0].first;
   }
 
   std::vector<std::string> headers;
@@ -85,16 +88,60 @@ LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)) {
   headers.push_back(header);
   add_apps_header(headers, config.pacman);
 
-  Uptane::Target tgt = finalizeIfNeeded(*storage, config.pacman);
-  headers.emplace_back("x-ats-target: " + tgt.filename());
+  std::pair<bool, Uptane::Target> pair = finalizeIfNeeded(*storage, config.pacman);
+  headers.emplace_back("x-ats-target: " + pair.second.filename());
   headers.emplace_back("x-ats-tags: " + boost::algorithm::join(config.pacman.tags, ","));
 
   auto http_client = std::make_shared<HttpClient>(&headers);
+  report_queue = std_::make_unique<ReportQueue>(config, http_client);
+
+  if (pair.first) {
+    notifyInstallFinished(pair.second, data::ResultCode::Numeric::kOk);
+  }
 
   KeyManager keys(storage, config.keymanagerConfig());
   keys.copyCertsToCurl(*http_client);
 
   primary = std::make_shared<SotaUptaneClient>(config, storage, http_client);
+}
+
+void LiteClient::notify(const Uptane::Target &t, std::unique_ptr<ReportEvent> event) {
+  if (!config.tls.server.empty()) {
+    event->custom["targetName"] = t.filename();
+    event->custom["version"] = t.custom_version();
+    report_queue->enqueue(std::move(event));
+  }
+}
+
+void LiteClient::notifyDownloadStarted(const Uptane::Target &t) {
+  notify(t, std_::make_unique<EcuDownloadStartedReport>(primary_serial, t.correlation_id()));
+}
+
+void LiteClient::notifyDownloadFinished(const Uptane::Target &t, bool success) {
+  notify(t, std_::make_unique<EcuDownloadCompletedReport>(primary_serial, t.correlation_id(), success));
+}
+
+void LiteClient::notifyInstallStarted(const Uptane::Target &t) {
+  notify(t, std_::make_unique<EcuInstallationStartedReport>(primary_serial, t.correlation_id()));
+}
+
+void LiteClient::notifyInstallFinished(const Uptane::Target &t, data::ResultCode::Numeric rc) {
+  if (rc == data::ResultCode::Numeric::kNeedCompletion) {
+    notify(t, std_::make_unique<EcuInstallationAppliedReport>(primary_serial, t.correlation_id()));
+  } else if (rc == data::ResultCode::Numeric::kOk) {
+    notify(t, std_::make_unique<EcuInstallationCompletedReport>(primary_serial, t.correlation_id(), true));
+  } else {
+    notify(t, std_::make_unique<EcuInstallationCompletedReport>(primary_serial, t.correlation_id(), false));
+  }
+}
+
+void generate_correlation_id(Uptane::Target &t) {
+  std::string id = t.custom_version();
+  if (id.empty()) {
+    id = t.filename();
+  }
+  boost::uuids::uuid tmp = boost::uuids::random_generator()();
+  t.setCorrelationId(id + "-" + boost::uuids::to_string(tmp));
 }
 
 bool target_has_tags(const Uptane::Target &t, const std::vector<std::string> &config_tags) {

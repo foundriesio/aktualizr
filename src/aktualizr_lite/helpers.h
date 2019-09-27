@@ -21,8 +21,18 @@ struct LiteClient {
   Config config;
   std::shared_ptr<INvStorage> storage;
   std::shared_ptr<SotaUptaneClient> primary;
+  std::unique_ptr<ReportQueue> report_queue;
+  Uptane::EcuSerial primary_serial;
+
+  void notifyDownloadStarted(const Uptane::Target& t);
+  void notifyDownloadFinished(const Uptane::Target& t, bool success);
+  void notifyInstallStarted(const Uptane::Target& t);
+  void notifyInstallFinished(const Uptane::Target& t, data::ResultCode::Numeric rc);
+
+  void notify(const Uptane::Target& t, std::unique_ptr<ReportEvent> event);
 };
 
+void generate_correlation_id(Uptane::Target& t);
 bool target_has_tags(const Uptane::Target& t, const std::vector<std::string>& config_tags);
 bool targets_eq(const Uptane::Target& t1, const Uptane::Target& t2, bool compareDockerApps);
 

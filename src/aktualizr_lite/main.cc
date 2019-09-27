@@ -138,11 +138,16 @@ static int get_lock(const char *lockfile) {
 }
 
 static int do_update(LiteClient &client, Uptane::Target &target, const char *lockfile) {
+  generate_correlation_id(target);
+  client.notifyDownloadStarted(target);
   if (!client.primary->downloadImage(target).first) {
+    client.notifyDownloadFinished(target, false);
     return 1;
   }
+  client.notifyDownloadFinished(target, true);
 
   if (client.primary->VerifyTarget(target) != TargetStatus::kGood) {
+    client.notifyInstallFinished(target, data::ResultCode::Numeric::kValidationFailed);
     LOG_ERROR << "Downloaded target is invalid";
   }
 
@@ -151,7 +156,9 @@ static int do_update(LiteClient &client, Uptane::Target &target, const char *loc
     return 1;
   }
 
+  client.notifyInstallStarted(target);
   auto iresult = client.primary->PackageInstall(target);
+  client.notifyInstallFinished(target, iresult.result_code.num_code);
   if (iresult.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion) {
     LOG_INFO << "Update complete. Please reboot the device to activate";
     client.storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kPending);
@@ -222,7 +229,11 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
       if (do_update(client, *target, lockfile) == 0) {
-        if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
+        if (target->MatchHash(current.hashes()[0])) {
+          LOG_INFO << "Update applied, hashes haven't changed";
+          client.storage->savePrimaryInstalledVersion(*target, InstalledVersionUpdateMode::kCurrent);
+          current = *target;
+        } else if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
           LOG_ERROR << "Unable to reboot system";
           return 1;
         }
