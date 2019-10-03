@@ -100,6 +100,18 @@ TEST(HttpClient, user_agent) {
   }
 }
 
+TEST(Headers, update_header) {
+  std::vector<std::string> headers = {"Authorization: Bearer bad"};
+  HttpClient http(&headers);
+
+  ASSERT_FALSE(http.updateHeader("NOSUCHHEADER", "foo"));
+
+  ASSERT_TRUE(http.updateHeader("Authorization", "Bearer token"));
+  std::string path = "/auth_call";
+  Json::Value response = http.get(server + path, HttpInterface::kNoLimit).getJson();
+  EXPECT_EQ(response["status"].asString(), "good");
+}
+
 // TODO: add tests for HttpClient::download
 
 #ifndef __NO_MAIN__
