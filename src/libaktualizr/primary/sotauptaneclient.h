@@ -66,6 +66,7 @@ class SotaUptaneClient {
   bool checkImagesMetaOffline();
   data::InstallationResult PackageInstall(const Uptane::Target &target);
   TargetStatus VerifyTarget(const Uptane::Target &target) { return package_manager_->verifyTarget(target); }
+  void reportNetworkInfo();
 
  protected:
   void addSecondary(const std::shared_ptr<Uptane::SecondaryInterface> &sec);
@@ -113,7 +114,6 @@ class SotaUptaneClient {
   void finalizeAfterReboot();
   void reportHwInfo();
   void reportInstalledPackages();
-  void reportNetworkInfo();
   void verifySecondaries();
   void sendMetadataToEcus(const std::vector<Uptane::Target> &targets);
   std::future<bool> sendFirmwareAsync(Uptane::SecondaryInterface &secondary, const std::shared_ptr<std::string> &data);

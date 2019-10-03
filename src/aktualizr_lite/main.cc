@@ -223,6 +223,9 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     if (!client.primary->updateImagesMeta()) {
       LOG_WARNING << "Unable to update latest metadata, using local copy";
     }
+
+    client.primary->reportNetworkInfo();
+
     auto target = find_target(client.primary, hwid, client.config.pacman.tags, "latest");
     if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
       LOG_INFO << "Updating base image to: " << *target;
@@ -343,6 +346,7 @@ int main(int argc, char *argv[]) {
 
     Config config(commandline_map);
     config.storage.uptane_metadata_path = BasedPath(config.storage.path / "metadata");
+    config.telemetry.report_network = !config.tls.server.empty();
     LOG_DEBUG << "Current directory: " << boost::filesystem::current_path().string();
 
     std::string cmd = commandline_map["command"].as<std::string>();
