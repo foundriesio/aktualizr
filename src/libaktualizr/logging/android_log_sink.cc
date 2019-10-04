@@ -16,8 +16,9 @@ class android_log_sink : public log::sinks::basic_sink_backend<log::sinks::synch
   }
 };
 
-void logger_init_sink(bool use_colors = false) {
+void logger_init_sink(bool use_colors = false, bool use_stdout = true) {
   (void)use_colors;
+  (void)use_stdout;
   typedef log::sinks::synchronous_sink<android_log_sink> android_log_sink_t;
   log::core::get()->add_sink(boost::shared_ptr<android_log_sink_t>(new android_log_sink_t()));
 }
