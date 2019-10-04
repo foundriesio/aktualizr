@@ -22,6 +22,7 @@ struct LiteClient {
   std::shared_ptr<INvStorage> storage;
   std::shared_ptr<SotaUptaneClient> primary;
   std::unique_ptr<ReportQueue> report_queue;
+  std::shared_ptr<HttpClient> http_client;
   Uptane::EcuSerial primary_serial;
 
   void notifyDownloadStarted(const Uptane::Target& t);
