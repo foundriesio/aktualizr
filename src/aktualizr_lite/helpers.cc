@@ -98,7 +98,7 @@ LiteClient::LiteClient(Config &config_in)
 
   headers.emplace_back("x-ats-tags: " + boost::algorithm::join(config.pacman.tags, ","));
 
-  auto http_client = std::make_shared<HttpClient>(&headers);
+  http_client = std::make_shared<HttpClient>(&headers);
   report_queue = std_::make_unique<ReportQueue>(config, http_client);
 
   if (pair.first) {
