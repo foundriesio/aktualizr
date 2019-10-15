@@ -228,9 +228,9 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   auto current = client.primary->getCurrent();
   LOG_INFO << "Active image is: " << current;
 
-  unsigned int interval = 300;
+  uint64_t interval = client.config.uptane.polling_sec;
   if (variables_map.count("interval") > 0) {
-    interval = variables_map["interval"].as<unsigned int>();
+    interval = variables_map["interval"].as<uint64_t>();
   }
 
   while (true) {
@@ -255,7 +255,7 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
         }
       }
     }
-    sleep(interval);
+    std::this_thread::sleep_for(std::chrono::seconds(interval));
   }
   return 0;
 }
@@ -303,7 +303,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("ostree-server", bpo::value<std::string>(), "url of the ostree repository")
       ("primary-ecu-hardware-id", bpo::value<std::string>(), "hardware ID of primary ecu")
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
-      ("interval", bpo::value<unsigned int>(), "optional interval in seconds to poll for update when in daemon mode. default=300")
+      ("interval", bpo::value<uint64_t>(), "Override uptane.polling_secs interval to poll for update when in daemon mode.")
       ("update-lockfile", bpo::value<boost::filesystem::path>(), "If provided, an flock(2) is applied to this file before performing an update in daemon mode")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
