@@ -361,9 +361,7 @@ int main(int argc, char *argv[]) {
 
     Config config(commandline_map);
     config.storage.uptane_metadata_path = BasedPath(config.storage.path / "metadata");
-    if (!config.tls.server.empty()) {
-      config.telemetry.report_network = true;
-    }
+    config.telemetry.report_network = !config.tls.server.empty();
     LOG_DEBUG << "Current directory: " << boost::filesystem::current_path().string();
 
     std::string cmd = commandline_map["command"].as<std::string>();
