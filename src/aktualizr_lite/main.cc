@@ -227,6 +227,12 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     }
 
     client.primary->reportNetworkInfo();
+    // reportNetworkInfo already checks `telemetry.report_network`. We need a
+    // way when not running in anonymous mode to decide if we should report
+    // hwinfo to the server. This flag is a good one to (ab)use.
+    if (client.config.telemetry.report_network) {
+      client.primary->reportHwInfo();
+    }
 
     auto target = find_target(client.primary, hwid, client.config.pacman.tags, "latest");
     if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {

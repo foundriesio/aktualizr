@@ -76,6 +76,7 @@ class SotaUptaneClient {
   data::InstallationResult PackageInstall(const Uptane::Target &target);
   TargetStatus VerifyTarget(const Uptane::Target &target) { return package_manager_->verifyTarget(target); }
   void reportNetworkInfo();
+  void reportHwInfo();
 
  protected:
   void addSecondary(const std::shared_ptr<Uptane::SecondaryInterface> &sec);
@@ -121,7 +122,6 @@ class SotaUptaneClient {
                                                 const Uptane::EcuSerial &ecu_id);
   data::InstallationResult PackageInstallSetResult(const Uptane::Target &target);
   void finalizeAfterReboot();
-  void reportHwInfo();
   void reportInstalledPackages();
   void verifySecondaries();
   void sendMetadataToEcus(const std::vector<Uptane::Target> &targets);
