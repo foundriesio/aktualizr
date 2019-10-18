@@ -37,6 +37,7 @@ void PackageConfig::updateFromPropertyTree(const boost::property_tree::ptree& pt
   CopyFromConfig(val, "tags", pt);
   if (val.length() > 0) {
     boost::split(tags, val, boost::is_any_of(", "), boost::token_compress_on);
+    val.clear();  // this is re-used by docker_apps
   }
 #ifdef BUILD_DOCKERAPP
   CopyFromConfig(val, "docker_apps", pt);
