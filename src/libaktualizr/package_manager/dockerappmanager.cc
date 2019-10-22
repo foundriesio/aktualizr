@@ -128,6 +128,10 @@ data::InstallationResult DockerAppManager::install(const Uptane::Target &target)
 //  3) sota.toml is updated with 1 docker app: "app1"
 // At this point we should stop app2 and remove it.
 void DockerAppManager::handleRemovedApps() const {
+  if (!boost::filesystem::is_directory(config.docker_apps_root)) {
+    LOG_DEBUG << "config.docker_apps_root does not exist";
+    return;
+  }
   for (auto &entry : boost::make_iterator_range(boost::filesystem::directory_iterator(config.docker_apps_root), {})) {
     if (boost::filesystem::is_directory(entry)) {
       std::string name = entry.path().filename().native();
