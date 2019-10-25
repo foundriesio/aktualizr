@@ -36,6 +36,7 @@ void PackageConfig::updateFromPropertyTree(const boost::property_tree::ptree& pt
 #ifdef BUILD_DOCKERAPP
   CopyFromConfig(docker_apps_root, "docker_apps_root", pt);
   CopyFromConfig(docker_compose_bin, "docker_compose_bin", pt);
+  CopyFromConfig(docker_prune, "docker_prune", pt);
   std::string val;
   CopyFromConfig(val, "docker_apps", pt);
   if (val.length() > 0) {
@@ -60,5 +61,6 @@ void PackageConfig::writeToStream(std::ostream& out_stream) const {
   writeOption(out_stream, docker_app_params, "docker_app_params");
   writeOption(out_stream, docker_app_bin, "docker_app_bin");
   writeOption(out_stream, docker_compose_bin, "docker_compose_bin");
+  writeOption(out_stream, docker_prune, "docker_prune");
 #endif
 }

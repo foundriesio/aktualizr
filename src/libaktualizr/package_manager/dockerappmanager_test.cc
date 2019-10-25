@@ -62,6 +62,7 @@ TEST(DockerAppManager, DockerApp_Fetch) {
   config.pacman.docker_apps_root = temp_dir / "docker_apps";
   config.pacman.docker_apps.push_back("app1");
   config.pacman.docker_app_bin = config.pacman.docker_compose_bin = "src/libaktualizr/package_manager/docker_fake.sh";
+  config.pacman.docker_prune = false;
   config.pacman.ostree_server = treehub_server;
   config.uptane.repo_server = repo_server + "/repo/repo";
   TemporaryDirectory dir;

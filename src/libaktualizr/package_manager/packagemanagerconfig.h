@@ -27,6 +27,7 @@ struct PackageConfig {
   boost::filesystem::path docker_app_params;
   boost::filesystem::path docker_app_bin{"/usr/bin/docker-app"};
   boost::filesystem::path docker_compose_bin{"/usr/bin/docker-compose"};
+  bool docker_prune{true};
 #endif
 
   // Options for simulation (to be used with kNone)
