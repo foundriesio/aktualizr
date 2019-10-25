@@ -161,7 +161,15 @@ data::InstallationResult DockerAppManager::install(const Uptane::Target &target)
     return DockerApp(app, config).start();
   };
   if (!iterate_apps(target, cb)) {
-    return data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not render docker app");
+    res = data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not render docker app");
+  }
+  if (config.docker_prune) {
+    LOG_INFO << "Pruning unused docker images";
+    // Utils::shell which isn't interactive, we'll use std::system so that
+    // stdout/stderr is streamed while docker sets things up.
+    if (std::system("docker image prune -a -f") != 0) {
+      LOG_WARNING << "Unable to prune unused docker images";
+    }
   }
   return res;
 }
