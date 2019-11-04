@@ -236,7 +236,9 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   while (true) {
     LOG_INFO << "Refreshing target metadata";
     if (!client.primary->updateImagesMeta()) {
-      LOG_WARNING << "Unable to update latest metadata, using local copy";
+      LOG_WARNING << "Unable to update latest metadata";
+      std::this_thread::sleep_for(std::chrono::seconds(interval));
+      continue;  // There's no point trying to look for an update
     }
 
     client.primary->reportNetworkInfo();
