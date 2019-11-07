@@ -256,6 +256,10 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
       data::ResultCode::Numeric rc = do_update(client, *target, lockfile);
       if (rc == data::ResultCode::Numeric::kOk) {
         current = *target;
+        client.http_client->updateHeader("x-ats-target", current.filename());
+        // Start the loop over to call updateImagesMeta which will update this
+        // device's target name on the server.
+        continue;
       } else if (rc == data::ResultCode::Numeric::kNeedCompletion) {
         if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
           LOG_ERROR << "Unable to reboot system";
