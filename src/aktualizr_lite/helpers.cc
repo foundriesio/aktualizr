@@ -4,6 +4,7 @@
 #include <boost/uuid/uuid_io.hpp>
 
 #include "package_manager/ostreemanager.h"
+#include "package_manager/packagemanagerfactory.h"
 
 #ifdef BUILD_DOCKERAPP
 static void add_apps_header(std::vector<std::string> &headers, PackageConfig &config) {
@@ -16,7 +17,10 @@ static void add_apps_header(std::vector<std::string> &headers, PackageConfig &co
   {}
 #endif
 
-static std::pair<bool, Uptane::Target> finalizeIfNeeded(INvStorage &storage, PackageConfig &config) {
+static std::pair<Uptane::Target, data::ResultCode::Numeric> finalizeIfNeeded(PackageManagerInterface &package_manager,
+                                                                             INvStorage &storage,
+                                                                             PackageConfig &config) {
+  data::ResultCode::Numeric result_code = data::ResultCode::Numeric::kUnknown;
   boost::optional<Uptane::Target> pending_version;
   storage.loadInstalledVersions("", nullptr, &pending_version);
 
@@ -32,8 +36,23 @@ static std::pair<bool, Uptane::Target> finalizeIfNeeded(INvStorage &storage, Pac
     if (current_hash == target.sha256Hash()) {
       LOG_INFO << "Marking target install complete for: " << target;
       storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kCurrent);
-      return std::make_pair(true, target);
+      result_code = data::ResultCode::Numeric::kOk;
+      if (package_manager.rebootDetected()) {
+        package_manager.rebootFlagClear();
+      }
+    } else {
+      if (package_manager.rebootDetected()) {
+        LOG_ERROR << "Expected to boot on " << target.sha256Hash() << " but found " << current_hash
+                  << ", system might have experienced a rollback";
+        storage.saveInstalledVersion("", target, InstalledVersionUpdateMode::kNone);
+        package_manager.rebootFlagClear();
+        result_code = data::ResultCode::Numeric::kInstallFailed;
+      } else {
+        // Update still pending as no reboot was detected
+        result_code = data::ResultCode::Numeric::kNeedCompletion;
+      }
     }
+    return std::make_pair(target, result_code);
   }
 
   std::vector<Uptane::Target> installed_versions;
@@ -46,10 +65,10 @@ static std::pair<bool, Uptane::Target> finalizeIfNeeded(INvStorage &storage, Pac
   std::vector<Uptane::Target>::reverse_iterator it;
   for (it = installed_versions.rbegin(); it != installed_versions.rend(); it++) {
     if (it->sha256Hash() == current_hash) {
-      return std::make_pair(false, *it);
+      return std::make_pair(*it, data::ResultCode::Numeric::kAlreadyProcessed);
     }
   }
-  return std::make_pair(false, Uptane::Target::Unknown());
+  return std::make_pair(Uptane::Target::Unknown(), result_code);
 }
 
 LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)), primary_serial(Uptane::EcuSerial::Unknown()) {
@@ -88,21 +107,24 @@ LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)), primar
   headers.push_back(header);
   add_apps_header(headers, config.pacman);
 
-  std::pair<bool, Uptane::Target> pair = finalizeIfNeeded(*storage, config.pacman);
-  headers.emplace_back("x-ats-target: " + pair.second.filename());
+  headers.emplace_back("x-ats-target: unknown");
   headers.emplace_back("x-ats-tags: " + boost::algorithm::join(config.pacman.tags, ","));
-
   http_client = std::make_shared<HttpClient>(&headers);
   report_queue = std_::make_unique<ReportQueue>(config, http_client);
+  package_manager = PackageManagerFactory::makePackageManager(config.pacman, config.bootloader, storage, http_client);
 
-  if (pair.first) {
-    notifyInstallFinished(pair.second, data::ResultCode::Numeric::kOk);
-  }
+  std::pair<Uptane::Target, data::ResultCode::Numeric> pair =
+      finalizeIfNeeded(*package_manager, *storage, config.pacman);
+  http_client->updateHeader("x-ats-target", pair.first.filename());
 
   KeyManager keys(storage, config.keymanagerConfig());
   keys.copyCertsToCurl(*http_client);
 
   primary = std::make_shared<SotaUptaneClient>(config, storage, http_client);
+
+  if (pair.second != data::ResultCode::Numeric::kAlreadyProcessed) {
+    notifyInstallFinished(pair.first, pair.second);
+  }
 }
 
 void LiteClient::notify(const Uptane::Target &t, std::unique_ptr<ReportEvent> event) {

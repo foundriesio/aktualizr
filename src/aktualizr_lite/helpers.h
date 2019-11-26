@@ -21,6 +21,7 @@ struct LiteClient {
   Config config;
   std::shared_ptr<INvStorage> storage;
   std::shared_ptr<SotaUptaneClient> primary;
+  std::shared_ptr<PackageManagerInterface> package_manager;
   std::unique_ptr<ReportQueue> report_queue;
   std::shared_ptr<HttpClient> http_client;
   Uptane::EcuSerial primary_serial;
