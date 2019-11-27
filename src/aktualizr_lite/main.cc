@@ -222,6 +222,9 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     interval = variables_map["interval"].as<uint64_t>();
   }
 
+  std::vector<Uptane::Target> installed_versions;
+  client.storage->loadPrimaryInstallationLog(&installed_versions, false);
+
   while (true) {
     LOG_INFO << "Refreshing target metadata";
     if (!client.primary->updateImagesMeta()) {
@@ -239,20 +242,27 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     }
 
     auto target = find_target(client.primary, hwid, client.config.pacman.tags, "latest");
-    if (target != nullptr && !targets_eq(*target, current, compareDockerApps)) {
-      LOG_INFO << "Updating base image to: " << *target;
+    if (target != nullptr) {
+      // This is a workaround for finding and avoiding bad updates after a rollback.
+      // Rollback sets the installed version state to none instead of broken, so there is no
+      // easy way to find just the bad versions without api/storage changes. As a workaround we
+      // just check if the version is known (old hash) and not current/pending and abort if so
+      bool known_target_sha = known_local_target(client, *target, installed_versions);
+      if (known_target_sha == false && !targets_eq(*target, current, compareDockerApps)) {
+        LOG_INFO << "Updating base image to: " << *target;
 
-      data::ResultCode::Numeric rc = do_update(client, *target, lockfile);
-      if (rc == data::ResultCode::Numeric::kOk) {
-        current = *target;
-        client.http_client->updateHeader("x-ats-target", current.filename());
-        // Start the loop over to call updateImagesMeta which will update this
-        // device's target name on the server.
-        continue;
-      } else if (rc == data::ResultCode::Numeric::kNeedCompletion) {
-        if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
-          LOG_ERROR << "Unable to reboot system";
-          return 1;
+        data::ResultCode::Numeric rc = do_update(client, *target, lockfile);
+        if (rc == data::ResultCode::Numeric::kOk) {
+          current = *target;
+          client.http_client->updateHeader("x-ats-target", current.filename());
+          // Start the loop over to call updateImagesMeta which will update this
+          // device's target name on the server.
+          continue;
+        } else if (rc == data::ResultCode::Numeric::kNeedCompletion) {
+          if (std::system(client.config.bootloader.reboot_command.c_str()) != 0) {
+            LOG_ERROR << "Unable to reboot system";
+            return 1;
+          }
         }
       }
     }
