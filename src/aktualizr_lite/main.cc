@@ -157,20 +157,8 @@ static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &t
     return data::ResultCode::Numeric::kInternalError;
   }
 
-  Uptane::Target current = client.primary->getCurrent();
-
   client.notifyInstallStarted(target);
   auto iresult = client.primary->PackageInstall(target);
-  // Make sure the update wasn't just for docker-apps
-  if (iresult.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion) {
-    for (const auto &it : current.hashes()) {
-      if (target.MatchHash(it)) {
-        iresult.result_code.num_code = data::ResultCode::Numeric::kOk;
-        break;
-      }
-    }
-  }
-  client.notifyInstallFinished(target, iresult.result_code.num_code);
   if (iresult.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion) {
     LOG_INFO << "Update complete. Please reboot the device to activate";
     client.storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kPending);
@@ -183,6 +171,7 @@ static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &t
     // let go of the lock since we couldn't update
     close(lockfd);
   }
+  client.notifyInstallFinished(target, iresult.result_code.num_code);
   return iresult.result_code.num_code;
 }
 
