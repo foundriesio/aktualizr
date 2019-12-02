@@ -5,7 +5,7 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <ostream>
 
-enum class RollbackMode { kBootloaderNone = 0, kUbootGeneric, kUbootMasked };
+enum class RollbackMode { kBootloaderNone = 0, kUbootGeneric, kUbootMasked, kFioVB };
 std::ostream& operator<<(std::ostream& os, RollbackMode mode);
 
 struct BootloaderConfig {
