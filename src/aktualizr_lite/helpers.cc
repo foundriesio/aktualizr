@@ -204,3 +204,26 @@ bool targets_eq(const Uptane::Target &t1, const Uptane::Target &t2, bool compare
   }
   return false;
 }
+
+bool known_local_target(LiteClient &client, const Uptane::Target &t, std::vector<Uptane::Target> &installed_versions) {
+  bool known_target = false;
+  auto current = client.primary->getCurrent();
+  boost::optional<Uptane::Target> pending;
+  client.storage->loadPrimaryInstalledVersions(nullptr, &pending);
+
+  if (t.sha256Hash() != current.sha256Hash()) {
+    std::vector<Uptane::Target>::reverse_iterator it;
+    for (it = installed_versions.rbegin(); it != installed_versions.rend(); it++) {
+      if (it->sha256Hash() == t.sha256Hash()) {
+        // Make sure installed version is not what is currently pending
+        if ((pending != boost::none) && (it->sha256Hash() == pending->sha256Hash())) {
+          continue;
+        }
+        LOG_INFO << "Target sha256Hash " << t.sha256Hash() << " known locally (rollback?), skipping";
+        known_target = true;
+        break;
+      }
+    }
+  }
+  return known_target;
+}
