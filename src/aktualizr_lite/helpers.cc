@@ -107,6 +107,12 @@ LiteClient::LiteClient(Config &config_in) : config(std::move(config_in)), primar
   headers.push_back(header);
   add_apps_header(headers, config.pacman);
 
+  if (!config.telemetry.report_network) {
+    // Provide the random primary ECU serial so our backend will have some
+    // idea of the number of unique devices using the system
+    headers.emplace_back("x-ats-primary: " + primary_serial.ToString());
+  }
+
   headers.emplace_back("x-ats-target: unknown");
   headers.emplace_back("x-ats-tags: " + boost::algorithm::join(config.pacman.tags, ","));
   http_client = std::make_shared<HttpClient>(&headers);
