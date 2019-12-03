@@ -32,6 +32,8 @@ struct LiteClient {
   void notifyInstallFinished(const Uptane::Target& t, data::ResultCode::Numeric rc);
 
   void notify(const Uptane::Target& t, std::unique_ptr<ReportEvent> event);
+  bool dockerAppsChanged();
+  void storeDockerParamsDigest();
 };
 
 void generate_correlation_id(Uptane::Target& t);

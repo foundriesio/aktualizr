@@ -217,6 +217,14 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   auto current = client.primary->getCurrent();
   LOG_INFO << "Active image is: " << current;
 
+  if (!current.MatchTarget(Uptane::Target::Unknown()) && client.dockerAppsChanged()) {
+    data::InstallationResult rc = client.package_manager->install(current);
+    if (!rc.isSuccess()) {
+      LOG_ERROR << "Unable to apply docker-app config changes: " << rc.description;
+    }
+  }
+  client.storeDockerParamsDigest();
+
   uint64_t interval = client.config.uptane.polling_sec;
   if (variables_map.count("interval") > 0) {
     interval = variables_map["interval"].as<uint64_t>();
