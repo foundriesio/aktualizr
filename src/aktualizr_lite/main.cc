@@ -12,13 +12,6 @@
 
 namespace bpo = boost::program_options;
 
-#ifdef BUILD_DOCKERAPP
-#define should_compare_docker_apps(config) \
-  (config.pacman.type == PackageManager::kOstreeDockerApp && !config.pacman.docker_apps.empty())
-#else
-#define should_compare_docker_apps(config) (false)
-#endif
-
 static void log_info_target(const std::string &prefix, const Config &config, const Uptane::Target &t) {
   auto name = t.filename();
   if (t.custom_version().length() > 0) {
@@ -205,6 +198,7 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
     LOG_ERROR << "reboot command: " << client.config.bootloader.reboot_command << " is not executable";
     return 1;
   }
+  bool firstLoop = true;
   bool compareDockerApps = should_compare_docker_apps(client.config);
   Uptane::HardwareIdentifier hwid(client.config.provision.primary_ecu_hardware_id);
   const char *lockfile = nullptr;
@@ -231,6 +225,17 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
       LOG_WARNING << "Unable to update latest metadata";
       std::this_thread::sleep_for(std::chrono::seconds(10));
       continue;  // There's no point trying to look for an update
+    }
+
+    if (firstLoop) {
+      // On first loop we need to see if we have a config change detected from
+      // from the previous run. We need to make sure we have up-to-date
+      // metadata, so this really needs to be inside the loop.
+      if (!current.MatchTarget(Uptane::Target::Unknown()) && client.dockerAppsChanged()) {
+        do_update(client, current, lockfile);
+      }
+      client.storeDockerParamsDigest();
+      firstLoop = false;
     }
 
     client.primary->reportNetworkInfo();
