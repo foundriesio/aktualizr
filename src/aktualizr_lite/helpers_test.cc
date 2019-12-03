@@ -123,6 +123,64 @@ TEST(helpers, targets_eq) {
   ASSERT_TRUE(targets_eq(t1, t2, true));
 }
 
+#ifdef BUILD_DOCKERAPP
+// Ensure we handle config changes of containers at start-up properly
+TEST(helpers, containers_initialize) {
+  TemporaryDirectory cfg_dir;
+
+  Config config;
+  config.storage.path = cfg_dir.Path();
+  config.pacman.type = PackageManager::kOstreeDockerApp;
+  config.pacman.sysroot = test_sysroot;
+  config.pacman.docker_apps_root = cfg_dir / "docker_apps";
+
+  std::shared_ptr<INvStorage> storage = INvStorage::newStorage(config.storage);
+
+  Json::Value target_json;
+  target_json["hashes"]["sha256"] = "deadbeef";
+  target_json["custom"]["targetFormat"] = "OSTREE";
+  target_json["length"] = 0;
+  Uptane::Target target("test-finalize", target_json);
+
+  LiteClient client(config);
+
+  // Nothing different - all empty
+  ASSERT_FALSE(client.dockerAppsChanged());
+
+  // Add a new app
+  client.config.pacman.docker_apps.push_back("app1");
+  ASSERT_TRUE(client.dockerAppsChanged());
+
+  // No apps configured, but one installed:
+  client.config.pacman.docker_apps.clear();
+  boost::filesystem::create_directories(client.config.pacman.docker_apps_root / "app1");
+  ASSERT_TRUE(client.dockerAppsChanged());
+
+  // One app configured, one app deployed
+  client.config.pacman.docker_apps.push_back("app1");
+  boost::filesystem::create_directories(client.config.pacman.docker_apps_root / "app1");
+  ASSERT_FALSE(client.dockerAppsChanged());
+
+  // Docker app parameters enabled
+  client.config.pacman.docker_app_params = cfg_dir / "foo.txt";
+  Utils::writeFile(client.config.pacman.docker_app_params, std::string("foo text content"));
+  ASSERT_TRUE(client.dockerAppsChanged());
+
+  // Store the hash of the file and make sure no change is detected
+  client.storeDockerParamsDigest();
+  ASSERT_FALSE(client.dockerAppsChanged());
+
+  // Change the content
+  Utils::writeFile(client.config.pacman.docker_app_params, std::string("foo text content changed"));
+  ASSERT_TRUE(client.dockerAppsChanged());
+
+  // Disable and ensure we detect the change
+  client.config.pacman.docker_app_params = "";
+  ASSERT_TRUE(client.dockerAppsChanged());
+  ASSERT_FALSE(boost::filesystem::exists(config.storage.path / ".params-hash"));
+}
+#endif
+
 #ifndef __NO_MAIN__
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
