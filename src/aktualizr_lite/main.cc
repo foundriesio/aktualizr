@@ -218,10 +218,7 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   LOG_INFO << "Active image is: " << current;
 
   if (!current.MatchTarget(Uptane::Target::Unknown()) && client.dockerAppsChanged()) {
-    data::InstallationResult rc = client.package_manager->install(current);
-    if (!rc.isSuccess()) {
-      LOG_ERROR << "Unable to apply docker-app config changes: " << rc.description;
-    }
+    do_update(client, current, lockfile);
   }
   client.storeDockerParamsDigest();
 
