@@ -123,6 +123,7 @@ TEST(helpers, targets_eq) {
   ASSERT_TRUE(targets_eq(t1, t2, true));
 }
 
+#ifdef BUILD_DOCKERAPP
 // Ensure we handle config changes of containers at start-up properly
 TEST(helpers, containers_initialize) {
   TemporaryDirectory cfg_dir;
@@ -178,6 +179,7 @@ TEST(helpers, containers_initialize) {
   ASSERT_TRUE(client.dockerAppsChanged());
   ASSERT_FALSE(boost::filesystem::exists(config.storage.path / ".params-hash"));
 }
+#endif
 
 #ifndef __NO_MAIN__
 int main(int argc, char **argv) {

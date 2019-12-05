@@ -12,13 +12,6 @@
 
 namespace bpo = boost::program_options;
 
-#ifdef BUILD_DOCKERAPP
-#define should_compare_docker_apps(config) \
-  (config.pacman.type == PackageManager::kOstreeDockerApp && !config.pacman.docker_apps.empty())
-#else
-#define should_compare_docker_apps(config) (false)
-#endif
-
 static void log_info_target(const std::string &prefix, const Config &config, const Uptane::Target &t) {
   auto name = t.filename();
   if (t.custom_version().length() > 0) {
