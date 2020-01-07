@@ -125,7 +125,8 @@ TEST(DockerAppManager, DockerApp_Fetch) {
   ASSERT_TRUE(boost::filesystem::exists(config.pacman.docker_apps_root / "docker-compose-down-called"));
 
   setenv("DOCKER_APP_FAIL", "1", 1);
-  ASSERT_EQ(TargetStatus::kInvalid, client->VerifyTarget(target));
+  result = client->package_manager_->fetchTarget(target, *(client->uptane_fetcher), keys, progress_cb, nullptr);
+  ASSERT_FALSE(result);
 }
 
 #ifndef __NO_MAIN__
