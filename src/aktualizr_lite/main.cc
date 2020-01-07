@@ -115,11 +115,18 @@ static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUpt
 
 static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &target) {
   generate_correlation_id(target);
+
+  std::unique_ptr<Lock> lock = client.getDownloadLock();
+  if (lock == nullptr) {
+    return data::ResultCode::Numeric::kInternalError;
+  }
   client.notifyDownloadStarted(target);
   if (!client.primary->downloadImage(target).first) {
+    lock->release();
     client.notifyDownloadFinished(target, false);
     return data::ResultCode::Numeric::kDownloadFailed;
   }
+  lock->release();
   client.notifyDownloadFinished(target, true);
 
   if (client.primary->VerifyTarget(target) != TargetStatus::kGood) {
@@ -128,8 +135,8 @@ static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &t
     return data::ResultCode::Numeric::kValidationFailed;
   }
 
-  std::unique_ptr<Lock> update_lock = client.getUpdateLock();
-  if (update_lock == nullptr) {
+  lock = client.getUpdateLock();
+  if (lock == nullptr) {
     return data::ResultCode::Numeric::kInternalError;
   }
 
@@ -141,11 +148,11 @@ static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &t
   } else if (iresult.result_code.num_code == data::ResultCode::Numeric::kOk) {
     LOG_INFO << "Update complete. No reboot needed";
     client.storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kCurrent);
-    update_lock->release();
+    lock->release();
   } else {
     LOG_ERROR << "Unable to install update: " << iresult.description;
     // let go of the lock since we couldn't update
-    update_lock->release();
+    lock->release();
   }
   client.notifyInstallFinished(target, iresult.result_code.num_code);
   return iresult.result_code.num_code;
@@ -186,6 +193,9 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   Uptane::HardwareIdentifier hwid(client.config.provision.primary_ecu_hardware_id);
   if (variables_map.count("update-lockfile") > 0) {
     client.update_lockfile = variables_map["update-lockfile"].as<boost::filesystem::path>();
+  }
+  if (variables_map.count("download-lockfile") > 0) {
+    client.download_lockfile = variables_map["download-lockfile"].as<boost::filesystem::path>();
   }
 
   auto current = client.primary->getCurrent();
@@ -301,6 +311,7 @@ bpo::variables_map parse_options(int argc, char *argv[]) {
       ("update-name", bpo::value<std::string>(), "optional name of the update when running \"update\". default=latest")
       ("interval", bpo::value<uint64_t>(), "Override uptane.polling_secs interval to poll for update when in daemon mode.")
       ("update-lockfile", bpo::value<boost::filesystem::path>(), "If provided, an flock(2) is applied to this file before performing an update in daemon mode")
+      ("download-lockfile", bpo::value<boost::filesystem::path>(), "If provided, an flock(2) is applied to this file before downloading an update in daemon mode")
       ("command", bpo::value<std::string>(), subs.c_str());
   // clang-format on
 

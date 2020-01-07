@@ -39,8 +39,10 @@ struct LiteClient {
   std::unique_ptr<ReportQueue> report_queue;
   std::shared_ptr<HttpClient> http_client;
   Uptane::EcuSerial primary_serial;
+  boost::filesystem::path download_lockfile;
   boost::filesystem::path update_lockfile;
 
+  std::unique_ptr<Lock> getDownloadLock();
   std::unique_ptr<Lock> getUpdateLock();
 
   void notifyDownloadStarted(const Uptane::Target& t);

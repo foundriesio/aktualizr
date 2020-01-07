@@ -254,6 +254,7 @@ static std::unique_ptr<Lock> create_lock(boost::filesystem::path lockfile) {
   return std_::make_unique<Lock>(fd);
 }
 
+std::unique_ptr<Lock> LiteClient::getDownloadLock() { return create_lock(download_lockfile); }
 std::unique_ptr<Lock> LiteClient::getUpdateLock() { return create_lock(update_lockfile); }
 
 void generate_correlation_id(Uptane::Target &t) {
