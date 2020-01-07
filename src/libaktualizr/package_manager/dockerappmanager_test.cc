@@ -5,6 +5,7 @@
 
 #include "config/config.h"
 #include "http/httpclient.h"
+#include "package_manager/ostreemanager.h"
 #include "package_manager/packagemanagerfactory.h"
 #include "package_manager/packagemanagerinterface.h"
 #include "primary/sotauptaneclient.h"
@@ -16,6 +17,26 @@ static std::string repo_server = "http://127.0.0.1:";
 static std::string treehub_server = "http://127.0.0.1:";
 static boost::filesystem::path test_sysroot;
 static boost::filesystem::path uptane_gen;
+
+static struct {
+  int serial{0};
+  std::string rev;
+} ostree_deployment;
+static std::string new_rev;
+
+extern "C" OstreeDeployment* ostree_sysroot_get_booted_deployment(OstreeSysroot* self) {
+  (void)self;
+  static GObjectUniquePtr<OstreeDeployment> dep;
+
+  dep.reset(ostree_deployment_new(0, "dummy-os", ostree_deployment.rev.c_str(), ostree_deployment.serial,
+                                  ostree_deployment.rev.c_str(), ostree_deployment.serial));
+  return dep.get();
+}
+
+extern "C" const char* ostree_deployment_get_csum(OstreeDeployment* self) {
+  (void)self;
+  return ostree_deployment.rev.c_str();
+}
 
 static void progress_cb(const Uptane::Target& target, const std::string& description, unsigned int progress) {
   (void)description;
@@ -56,6 +77,9 @@ TEST(DockerAppManager, DockerApp_Fetch) {
   auto repo = temp_dir.Path();
   auto repod = create_repo(repo);
 
+  ostree_deployment.serial = 1;
+  ostree_deployment.rev = sha;
+
   Config config;
   config.pacman.type = PackageManager::kOstreeDockerApp;
   config.pacman.sysroot = test_sysroot;
@@ -73,6 +97,7 @@ TEST(DockerAppManager, DockerApp_Fetch) {
   boost::filesystem::create_directories(config.pacman.docker_apps_root / "delete-this-app");
 
   std::shared_ptr<INvStorage> storage = INvStorage::newStorage(config.storage);
+  storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kCurrent);
   KeyManager keys(storage, config.keymanagerConfig());
   auto client = std_::make_unique<SotaUptaneClient>(config, storage);
   ASSERT_TRUE(client->updateImagesMeta());
