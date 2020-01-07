@@ -15,6 +15,20 @@ struct Version {
   bool operator<(const Version& other) { return strverscmp(raw_ver.c_str(), other.raw_ver.c_str()) < 0; }
 };
 
+class Lock {
+ public:
+  Lock(int fd) : fd_(fd) {}
+
+  void release() {
+    if (fd_ != -1) {
+      close(fd_);
+    }
+  }
+
+ private:
+  int fd_;
+};
+
 struct LiteClient {
   LiteClient(Config& config_in);
 
@@ -25,6 +39,9 @@ struct LiteClient {
   std::unique_ptr<ReportQueue> report_queue;
   std::shared_ptr<HttpClient> http_client;
   Uptane::EcuSerial primary_serial;
+  boost::filesystem::path update_lockfile;
+
+  std::unique_ptr<Lock> getUpdateLock();
 
   void notifyDownloadStarted(const Uptane::Target& t);
   void notifyDownloadFinished(const Uptane::Target& t, bool success);

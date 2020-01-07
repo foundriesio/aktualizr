@@ -1,5 +1,3 @@
-#include <sys/file.h>
-#include <unistd.h>
 #include <iostream>
 
 #include <boost/filesystem.hpp>
@@ -115,22 +113,7 @@ static std::unique_ptr<Uptane::Target> find_target(const std::shared_ptr<SotaUpt
   throw std::runtime_error("Unable to find update");
 }
 
-static int get_lock(const char *lockfile) {
-  int fd = open(lockfile, O_RDWR | O_CREAT | O_APPEND, 0666);
-  if (fd < 0) {
-    LOG_ERROR << "Unable to open lock file";
-    return -1;
-  }
-  LOG_INFO << "Acquiring lock";
-  if (flock(fd, LOCK_EX) < 0) {
-    LOG_ERROR << "Unable to acquire lock";
-    close(fd);
-    return -1;
-  }
-  return fd;
-}
-
-static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &target, const char *lockfile) {
+static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &target) {
   generate_correlation_id(target);
   client.notifyDownloadStarted(target);
   if (!client.primary->downloadImage(target).first) {
@@ -145,8 +128,8 @@ static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &t
     return data::ResultCode::Numeric::kValidationFailed;
   }
 
-  int lockfd = 0;
-  if (lockfile != nullptr && (lockfd = get_lock(lockfile)) < 0) {
+  std::unique_ptr<Lock> update_lock = client.getUpdateLock();
+  if (update_lock == nullptr) {
     return data::ResultCode::Numeric::kInternalError;
   }
 
@@ -158,11 +141,11 @@ static data::ResultCode::Numeric do_update(LiteClient &client, Uptane::Target &t
   } else if (iresult.result_code.num_code == data::ResultCode::Numeric::kOk) {
     LOG_INFO << "Update complete. No reboot needed";
     client.storage->savePrimaryInstalledVersion(target, InstalledVersionUpdateMode::kCurrent);
-    close(lockfd);
+    update_lock->release();
   } else {
     LOG_ERROR << "Unable to install update: " << iresult.description;
     // let go of the lock since we couldn't update
-    close(lockfd);
+    update_lock->release();
   }
   client.notifyInstallFinished(target, iresult.result_code.num_code);
   return iresult.result_code.num_code;
@@ -182,7 +165,7 @@ static int update_main(LiteClient &client, const bpo::variables_map &variables_m
     return 0;
   }
   LOG_INFO << "Updating to: " << *target;
-  data::ResultCode::Numeric rc = do_update(client, *target, nullptr);
+  data::ResultCode::Numeric rc = do_update(client, *target);
   if (rc == data::ResultCode::Numeric::kNeedCompletion || rc == data::ResultCode::Numeric::kOk) {
     return 0;
   }
@@ -201,11 +184,8 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
   bool firstLoop = true;
   bool compareDockerApps = should_compare_docker_apps(client.config);
   Uptane::HardwareIdentifier hwid(client.config.provision.primary_ecu_hardware_id);
-  const char *lockfile = nullptr;
-  boost::filesystem::path lockfilePath;
   if (variables_map.count("update-lockfile") > 0) {
-    lockfilePath = variables_map["update-lockfile"].as<boost::filesystem::path>();
-    lockfile = lockfilePath.c_str();
+    client.update_lockfile = variables_map["update-lockfile"].as<boost::filesystem::path>();
   }
 
   auto current = client.primary->getCurrent();
@@ -232,7 +212,7 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
       // from the previous run. We need to make sure we have up-to-date
       // metadata, so this really needs to be inside the loop.
       if (!current.MatchTarget(Uptane::Target::Unknown()) && client.dockerAppsChanged()) {
-        do_update(client, current, lockfile);
+        do_update(client, current);
       }
       client.storeDockerParamsDigest();
       firstLoop = false;
@@ -256,7 +236,7 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
       if (known_target_sha == false && !targets_eq(*target, current, compareDockerApps)) {
         LOG_INFO << "Updating base image to: " << *target;
 
-        data::ResultCode::Numeric rc = do_update(client, *target, lockfile);
+        data::ResultCode::Numeric rc = do_update(client, *target);
         if (rc == data::ResultCode::Numeric::kOk) {
           current = *target;
           client.http_client->updateHeader("x-ats-target", current.filename());

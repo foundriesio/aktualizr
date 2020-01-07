@@ -1,8 +1,10 @@
-#include "helpers.h"
+#include <sys/file.h>
+#include <unistd.h>
 
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
+#include "helpers.h"
 #include "package_manager/ostreemanager.h"
 #include "package_manager/packagemanagerfactory.h"
 
@@ -231,6 +233,28 @@ void LiteClient::notifyInstallFinished(const Uptane::Target &t, data::ResultCode
     notify(t, std_::make_unique<EcuInstallationCompletedReport>(primary_serial, t.correlation_id(), false));
   }
 }
+
+static std::unique_ptr<Lock> create_lock(boost::filesystem::path lockfile) {
+  if (lockfile.empty()) {
+    // Just return a dummy one that will safely "close"
+    return std_::make_unique<Lock>(-1);
+  }
+
+  int fd = open(lockfile.c_str(), O_RDWR | O_CREAT | O_APPEND, 0666);
+  if (fd < 0) {
+    LOG_ERROR << "Unable to open lock file " << lockfile;
+    return nullptr;
+  }
+  LOG_INFO << "Acquiring lock";
+  if (flock(fd, LOCK_EX) < 0) {
+    LOG_ERROR << "Unable to acquire lock on " << lockfile;
+    close(fd);
+    return nullptr;
+  }
+  return std_::make_unique<Lock>(fd);
+}
+
+std::unique_ptr<Lock> LiteClient::getUpdateLock() { return create_lock(update_lockfile); }
 
 void generate_correlation_id(Uptane::Target &t) {
   std::string id = t.custom_version();
