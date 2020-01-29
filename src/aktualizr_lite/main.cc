@@ -239,6 +239,10 @@ static int daemon_main(LiteClient &client, const bpo::variables_map &variables_m
 
     auto target = find_target(client.primary, hwid, client.config.pacman.tags, "latest");
     if (target != nullptr) {
+      // do_update sets this information, so we have to set it here so that
+      // targets_eq function can compare them properly
+      target->InsertEcu(client.primary_ecu.first, client.primary_ecu.second);
+
       // This is a workaround for finding and avoiding bad updates after a rollback.
       // Rollback sets the installed version state to none instead of broken, so there is no
       // easy way to find just the bad versions without api/storage changes. As a workaround we
