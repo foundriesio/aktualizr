@@ -67,7 +67,7 @@ class OstreeManager : public PackageManagerInterface {
  private:
   TargetStatus verifyTargetInternal(const Uptane::Target &target) const;
 
- private:
+ protected:
   std::unique_ptr<Bootloader> bootloader_;
 };
 
