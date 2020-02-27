@@ -201,6 +201,7 @@ LiteClient::LiteClient(Config &config_in)
   primary = std::make_shared<SotaUptaneClient>(config, storage, http_client);
   primary->initializePrimaryEcu();
 
+  writeCurrentTarget(pair.first);
   if (pair.second != data::ResultCode::Numeric::kAlreadyProcessed) {
     notifyInstallFinished(pair.first, pair.second);
   }
@@ -230,10 +231,16 @@ void LiteClient::notifyInstallFinished(const Uptane::Target &t, data::ResultCode
   if (rc == data::ResultCode::Numeric::kNeedCompletion) {
     notify(t, std_::make_unique<EcuInstallationAppliedReport>(primary_ecu.first, t.correlation_id()));
   } else if (rc == data::ResultCode::Numeric::kOk) {
+    writeCurrentTarget(t);
     notify(t, std_::make_unique<EcuInstallationCompletedReport>(primary_ecu.first, t.correlation_id(), true));
   } else {
     notify(t, std_::make_unique<EcuInstallationCompletedReport>(primary_ecu.first, t.correlation_id(), false));
   }
+}
+
+void LiteClient::writeCurrentTarget(const Uptane::Target &t) {
+  std::string content("TARGET_NAME=\"" + t.filename() + "\"\nCUSTOM_VERSION=\"" + t.custom_version() + "\"\n");
+  Utils::writeFile(config.storage.path / "current-target", content);
 }
 
 static std::unique_ptr<Lock> create_lock(boost::filesystem::path lockfile) {
