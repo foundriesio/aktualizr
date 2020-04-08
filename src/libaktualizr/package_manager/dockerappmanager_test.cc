@@ -7,6 +7,7 @@
 #include "http/httpclient.h"
 #include "package_manager/dockerappmanager.h"
 #include "package_manager/ostreemanager.h"
+#include "package_manager/dockerappmanager.h"
 #include "package_manager/packagemanagerfactory.h"
 #include "package_manager/packagemanagerinterface.h"
 #include "primary/sotauptaneclient.h"
