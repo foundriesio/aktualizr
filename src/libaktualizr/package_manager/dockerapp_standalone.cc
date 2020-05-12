@@ -168,6 +168,7 @@ data::InstallationResult DockerAppStandalone::install(const Uptane::Target &targ
     updateNotify();
     res = OstreeManager::install(target);
     if (res.result_code.num_code == data::ResultCode::Numeric::kInstallFailed) {
+      // TODO: num_code is supposed to be kOk or kNeedCompletion, otherwise it's considered as failed?
       LOG_ERROR << "Failed to install OSTree target, skipping Docker Apps";
       return res;
     }
@@ -177,13 +178,24 @@ data::InstallationResult DockerAppStandalone::install(const Uptane::Target &targ
   }
 
   handleRemovedApps(target);
-  auto cb = [this](const std::string &app, const Uptane::Target &app_target) {
-    LOG_INFO << "Installing " << app << " -> " << app_target;
-    return DockerApp(app, config).start();
-  };
-  if (!iterate_apps(target, cb)) {
-    res = data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not render docker app");
+
+  if (res.result_code.num_code == data::ResultCode::Numeric::kOk) {
+    auto cb = [this](const std::string &app, const Uptane::Target &app_target) {
+      LOG_INFO << "Installing " << app << " -> " << app_target;
+      return DockerApp(app, config).start();
+    };
+    if (!iterate_apps(target, cb)) {
+      res = data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not render docker app");
+    }
+  } else if (res.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion) {
+    LOG_INFO << "Reboot is expected, skipping the docker app(s) (re-)start and docker image pruning";
+    return res;
+  } else {
+    // TODO: this case is supposed to be handled at the beginning of this routine
+    LOG_ERROR << "Failed to install OSTree target, skipping Docker Apps";
+    return res;
   }
+
 
   if (dappcfg_.docker_prune) {
     LOG_INFO << "Pruning unused docker images";
