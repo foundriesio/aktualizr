@@ -73,13 +73,14 @@ struct DockerApp {
     return std::system(cmd.c_str()) == 0;
   }
 
-  bool start() {
+  bool start(bool no_start = false) {
     // Depending on the number and size of the containers in the docker-app,
     // this command can take a bit of time to complete. Rather than using,
     // Utils::shell which isn't interactive, we'll use std::system so that
     // stdout/stderr is streamed while docker sets things up.
     auto bin = boost::filesystem::canonical(compose_bin).string();
-    std::string cmd("cd " + app_root.string() + " && " + bin + " up --remove-orphans -d");
+    auto mode = no_start?"--no-start":"-d";
+    std::string cmd("cd " + app_root.string() + " && " + bin + " up --remove-orphans " + mode);
     return std::system(cmd.c_str()) == 0;
   }
 
@@ -168,6 +169,7 @@ data::InstallationResult DockerAppStandalone::install(const Uptane::Target &targ
     updateNotify();
     res = OstreeManager::install(target);
     if (res.result_code.num_code == data::ResultCode::Numeric::kInstallFailed) {
+      // TODO: num_code is supposed to be kOk or kNeedCompletion, otherwise it's considered as failed?
       LOG_ERROR << "Failed to install OSTree target, skipping Docker Apps";
       return res;
     }
@@ -177,10 +179,17 @@ data::InstallationResult DockerAppStandalone::install(const Uptane::Target &targ
   }
 
   handleRemovedApps(target);
-  auto cb = [this](const std::string &app, const Uptane::Target &app_target) {
+
+  auto dont_start_container = res.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion;
+  if (dont_start_container) {
+    LOG_INFO << "Reboot is expected, skipping the docker app(s) (re-)start";
+  }
+
+  auto cb = [&dont_start_container, this](const std::string &app, const Uptane::Target &app_target) {
     LOG_INFO << "Installing " << app << " -> " << app_target;
-    return DockerApp(app, config).start();
+    return DockerApp(app, config).start(dont_start_container);
   };
+
   if (!iterate_apps(target, cb)) {
     res = data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not render docker app");
   }

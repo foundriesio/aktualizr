@@ -46,14 +46,17 @@ struct AppBundle {
 
   bool fetch(const std::string &app_uri) { return cmd_streaming("docker app pull " + app_uri); }
 
-  bool start(const std::string &app_uri) {
+  bool start(const std::string &app_uri, bool only_render = false) {
     boost::filesystem::create_directories(app_root);
     std::string cmd("cd " + app_root.string() + " && docker app image render -o docker-compose.yml " + app_uri);
     if (!app_params.empty()) {
       cmd += " --parameters-file " + app_params.string();
     }
-    if (!cmd_streaming(cmd)) {
-      return false;
+
+    bool res = false;
+    res = cmd_streaming(cmd);
+    if (only_render || res != true) {
+      return res;
     }
 
     return cmd_streaming("cd " + app_root.string() + " && " + compose_bin + " up --remove-orphans -d");
@@ -144,14 +147,17 @@ data::InstallationResult DockerAppBundles::install(const Uptane::Target &target)
   }
 
   handleRemovedApps(target);
+
+  bool only_render = (res.result_code.num_code == data::ResultCode::Numeric::kNeedCompletion);
+
   for (const auto &pair : iterate_apps(target)) {
     LOG_INFO << "Installing " << pair.first << " -> " << pair.second;
-    if (!AppBundle(pair.first, dappcfg_).start(pair.second)) {
+    if (!AppBundle(pair.first, dappcfg_).start(pair.second, only_render)) {
       res = data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not install docker app");
     }
   };
 
-  if (dappcfg_.docker_prune) {
+  if (!only_render && dappcfg_.docker_prune) {
     LOG_INFO << "Pruning unused docker images";
     // Utils::shell which isn't interactive, we'll use std::system so that
     // stdout/stderr is streamed while docker sets things up.
