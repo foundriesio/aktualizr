@@ -85,33 +85,7 @@ std::vector<Hash> Hash::decodeVector(std::string hashes_str) {
 
 Target::Target(std::string filename, const Json::Value &content) : filename_(std::move(filename)) {
   if (content.isMember("custom")) {
-    custom_ = content["custom"];
-
-    // Image repo provides an array of hardware IDs.
-    if (custom_.isMember("hardwareIds")) {
-      Json::Value hwids = custom_["hardwareIds"];
-      for (auto i = hwids.begin(); i != hwids.end(); ++i) {
-        hwids_.emplace_back(HardwareIdentifier((*i).asString()));
-      }
-    }
-
-    // Director provides a map of ECU serials to hardware IDs.
-    Json::Value ecus = custom_["ecuIdentifiers"];
-    for (auto i = ecus.begin(); i != ecus.end(); ++i) {
-      ecus_.insert({EcuSerial(i.key().asString()), HardwareIdentifier((*i)["hardwareId"].asString())});
-    }
-
-    if (custom_.isMember("targetFormat")) {
-      type_ = custom_["targetFormat"].asString();
-    }
-
-    if (custom_.isMember("uri")) {
-      std::string custom_uri = custom_["uri"].asString();
-      // Ignore this exact URL for backwards compatibility with old defaults that inserted it.
-      if (custom_uri != "https://example.com/") {
-        uri_ = std::move(custom_uri);
-      }
-    }
+    updateCustom(content["custom"]);
   }
 
   length_ = content["length"].asUInt64();
@@ -180,6 +154,37 @@ bool Target::IsOstree() const {
     // If type is explicitly not OSTREE or the length is non-zero, then this
     // is a firmware blob.
     return false;
+  }
+}
+
+void Target::updateCustom(const Json::Value &custom) {
+  custom_ = custom;
+  // Image repo provides an array of hardware IDs.
+  if (custom_.isMember("hardwareIds")) {
+    Json::Value hwids = custom_["hardwareIds"];
+    for (auto i = hwids.begin(); i != hwids.end(); ++i) {
+      hwids_.emplace_back(HardwareIdentifier((*i).asString()));
+    }
+  }
+
+  if (custom_.isMember("ecuIdentifiers")) {
+    // Director provides a map of ECU serials to hardware IDs.
+    Json::Value ecus = custom_["ecuIdentifiers"];
+    for (auto i = ecus.begin(); i != ecus.end(); ++i) {
+      ecus_.insert({EcuSerial(i.key().asString()), HardwareIdentifier((*i)["hardwareId"].asString())});
+    }
+  }
+
+  if (custom_.isMember("targetFormat")) {
+    type_ = custom_["targetFormat"].asString();
+  }
+
+  if (custom_.isMember("uri")) {
+    std::string custom_uri = custom_["uri"].asString();
+    // Ignore this exact URL for backwards compatibility with old defaults that inserted it.
+    if (custom_uri != "https://example.com/") {
+      uri_ = std::move(custom_uri);
+    }
   }
 }
 
