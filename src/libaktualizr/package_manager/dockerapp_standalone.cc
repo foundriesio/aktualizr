@@ -69,7 +69,7 @@ struct DockerApp {
 
   bool fetch() {
     auto bin = boost::filesystem::canonical(compose_bin).string();
-    std::string cmd("cd " + app_root.string() + " && " + bin + " pull");
+    std::string cmd("cd " + app_root.string() + " && " + bin + " pull --no-parallel");
     return std::system(cmd.c_str()) == 0;
   }
 
