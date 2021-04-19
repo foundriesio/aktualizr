@@ -134,8 +134,8 @@ void Bootloader::rebootFlagClear() {
   boost::filesystem::remove(reboot_sentinel_);
 }
 
-void Bootloader::reboot(bool fake_reboot) {
-  if (fake_reboot) {
+void Bootloader::reboot(bool fake) {
+  if (fake) {
     boost::filesystem::remove(reboot_sentinel_);
     return;
   }
