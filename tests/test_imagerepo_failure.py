@@ -45,6 +45,35 @@ def test_imagerepo_update_after_metadata_download_failure(install_mngr, director
 
 
 """
+Verifies aktualizr error logs in the occasion of an targets.json file that does not match
+the hashes referenced in snapshot.json.
+After the first failure, the correct file is sent, and the installation succeeds.
+"""
+
+@with_uptane_backend(start_generic_server=True)
+@with_path(paths=['/targets.json'])
+@with_imagerepo(handlers=[
+                            MalformedJsonHandler(number_of_failures=1),
+                        ])
+@with_director(start=False)
+@with_aktualizr(start=False, run_mode='full', log_level=2)
+@with_install_manager()
+def test_incorrect_targets_logs(install_mngr, director,
+                                aktualizr, **kwargs):
+    with aktualizr, director:
+            install_result = director.wait_for_install()
+            logger.info('Director install result: {}'.format(install_result))
+            install_result = install_result and install_mngr.are_images_installed()
+            logger.info('Are images installed: {}'.format(install_result))
+            output = aktualizr.output()
+            if not "Signature verification for Image repo Targets metadata failed: Hash metadata mismatch" in output:
+                return False
+            if not "Failed to update Image repo metadata: Hash metadata mismatch" in output:
+                return False
+            logger.info(output)
+    return install_result
+
+"""
 Verifies whether aktualizr is updatable after image download failure
 with follow-up successful download.
 
@@ -106,6 +135,7 @@ if __name__ == "__main__":
         test_imagerepo_update_after_metadata_download_failure,
         test_imagerepo_update_after_image_download_failure,
         test_imagerepo_unsuccessful_download,
+        test_incorrect_targets_logs,
     ]
 
     with TestRunner(test_suite) as runner:
