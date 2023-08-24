@@ -209,6 +209,8 @@ void ImageRepository::updateRoot(INvStorage& storage, const IMetadataFetcher& fe
 }
 
 void ImageRepository::updateMeta(INvStorage& storage, const IMetadataFetcher& fetcher) {
+  const auto timestamp_stored_signature{timestamp.isInitialized() ? timestamp.signature() : ""};
+
   updateRoot(storage, fetcher);
 
   // Update Image repo Timestamp metadata
@@ -226,7 +228,6 @@ void ImageRepository::updateMeta(INvStorage& storage, const IMetadataFetcher& fe
       local_version = -1;
     }
 
-    const auto timestamp_stored_signature{timestamp.isInitialized() ? timestamp.signature() : ""};
     verifyTimestamp(image_timestamp);
 
     if (local_version > remote_version) {
