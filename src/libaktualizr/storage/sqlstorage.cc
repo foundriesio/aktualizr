@@ -535,6 +535,7 @@ void SQLStorage::storeRoot(const std::string& data, Uptane::RepositoryType repo,
 void SQLStorage::storeNonRoot(const std::string& data, Uptane::RepositoryType repo, const Uptane::Role role) {
   SQLite3Guard db = dbConnection();
 
+  LOG_DEBUG << "Storing " << role << " for " << repo << " repo in SQL storage";
   db.beginTransaction();
 
   auto del_statement = db.prepareStatement<int, int>("DELETE FROM meta WHERE (repo=? AND meta_type=?);",

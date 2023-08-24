@@ -288,6 +288,34 @@ TEST_F(AkliteTest, ostreeUpdate) {
   }
 }
 
+/*
+ * Test that verifies if metadata files are being stored when there are changes and also not being stored
+ * when the files have not changed.
+ */
+TEST_F(AkliteTest, timestampStoreLogsTest) {
+  AkliteMock aklite{conf()};
+  std::string log_output;
+  tufRepo().add_target("target-01", treehub().getRev(), "primary_hw");
+
+  // On first update, metadata is expected to be stored
+  testing::internal::CaptureStdout();
+  logger_set_threshold(boost::log::trivial::debug);
+  aklite.update();
+  log_output = testing::internal::GetCapturedStdout();
+  EXPECT_NE(std::string::npos, log_output.find("Storing timestamp for image repo"));
+  EXPECT_NE(std::string::npos, log_output.find("Storing snapshot for image repo"));
+  EXPECT_NE(std::string::npos, log_output.find("Storing targets for image repo"));
+
+  // If there were no changes, no metadata should be stored
+  testing::internal::CaptureStdout();
+  logger_set_threshold(boost::log::trivial::debug);
+  aklite.update();
+  log_output = testing::internal::GetCapturedStdout();
+  EXPECT_EQ(std::string::npos, log_output.find("Storing timestamp for image repo"));
+  EXPECT_EQ(std::string::npos, log_output.find("Storing snapshot for image repo"));
+  EXPECT_EQ(std::string::npos, log_output.find("Storing targets for image repo"));
+}
+
 #ifndef __NO_MAIN__
 int main(int argc, char** argv) {
   ::testing::InitGoogleTest(&argc, argv);
