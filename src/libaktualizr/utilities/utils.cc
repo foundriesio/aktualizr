@@ -814,7 +814,7 @@ std::string Utils::urlEncode(const std::string &input) {
   return res;
 }
 
-CURL *Utils::curlDupHandleWrapper(CURL *const curl_in, const bool using_pkcs11) {
+CURL *Utils::curlDupHandleWrapper(CURL *const curl_in, const bool using_pkcs11, CURLSH *share) {
   CURL *curl = curl_easy_duphandle(curl_in);
 
   // This is a workaround for a bug in curl. It has been fixed in
@@ -823,6 +823,9 @@ CURL *Utils::curlDupHandleWrapper(CURL *const curl_in, const bool using_pkcs11) 
   // workaround.
   if (using_pkcs11) {
     curlEasySetoptWrapper(curl, CURLOPT_SSLENGINE, "pkcs11");
+  }
+  if (share != nullptr) {
+    curl_easy_setopt(curl, CURLOPT_SHARE, share);
   }
   return curl;
 }

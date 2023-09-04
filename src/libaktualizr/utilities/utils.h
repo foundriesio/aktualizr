@@ -44,7 +44,7 @@ struct Utils {
   static void createDirectories(const boost::filesystem::path &path, mode_t mode);
   static bool createSecureDirectory(const boost::filesystem::path &path);
   static std::string urlEncode(const std::string &input);
-  static CURL *curlDupHandleWrapper(CURL *curl_in, bool using_pkcs11);
+  static CURL *curlDupHandleWrapper(CURL *curl_in, bool using_pkcs11, CURLSH *share);
   static std::vector<boost::filesystem::path> getDirEntriesByExt(const boost::filesystem::path &dir_path,
                                                                  const std::string &ext);
   static void setStorageRootPath(const std::string &storage_root_path);
