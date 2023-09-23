@@ -194,6 +194,7 @@ HttpResponse HttpClient::post(const std::string& url, const std::string& content
   curlEasySetoptWrapper(curl_post, CURLOPT_URL, url.c_str());
   curlEasySetoptWrapper(curl_post, CURLOPT_POST, 1);
   curlEasySetoptWrapper(curl_post, CURLOPT_POSTFIELDS, data.c_str());
+  curlEasySetoptWrapper(curl_post, CURLOPT_POSTFIELDSIZE, data.size());
   auto result = perform(curl_post, RETRY_TIMES, HttpInterface::kPostRespLimit);
   curl_easy_cleanup(curl_post);
   curl_slist_free_all(req_headers);
