@@ -86,17 +86,22 @@ class P11Engine {
 class P11EngineGuard {
  public:
   explicit P11EngineGuard(boost::filesystem::path module_path, std::string pass, std::string label) {
+      LOG_INFO << "DETSCH P11EngineGuard: NEW";
     if (instance == nullptr) {
+      LOG_INFO << "DETSCH P11EngineGuard: creating P11Engine instance";
       instance = new P11Engine(std::move(module_path), std::move(pass), std::move(label));
     }
+    LOG_INFO << "DETSCH P11EngineGuard: NEW ref_counter=" << ref_counter;
     ++ref_counter;
   }
 
   ~P11EngineGuard() {
+    LOG_INFO << "DETSCH P11EngineGuard DESTROY ref_counter=" << ref_counter;
     if (ref_counter != 0) {
       --ref_counter;
     }
     if (ref_counter == 0) {
+      LOG_INFO << "DETSCH P11EngineGuard DESTROY deleting instance";
       delete instance;
       instance = nullptr;
     }

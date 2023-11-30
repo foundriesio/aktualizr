@@ -25,6 +25,7 @@ P11ContextWrapper::P11ContextWrapper(const boost::filesystem::path& module) {
   }
   // never returns NULL
   ctx = PKCS11_CTX_new();
+  LOG_INFO << "DETSCH: NEW P11ContextWrapper ctx=" << ctx;
   if (PKCS11_CTX_load(ctx, module.c_str()) != 0) {
     PKCS11_CTX_free(ctx);
     LOG_ERROR << "Couldn't load PKCS11 module " << module.string() << ": "
@@ -34,6 +35,7 @@ P11ContextWrapper::P11ContextWrapper(const boost::filesystem::path& module) {
 }
 
 P11ContextWrapper::~P11ContextWrapper() {
+  LOG_INFO << "DETSCH: DESTROYING P11ContextWrapper ctx=" << ctx;
   if (ctx != nullptr) {
     PKCS11_CTX_unload(ctx);
     PKCS11_CTX_free(ctx);
@@ -74,13 +76,13 @@ P11Engine::P11Engine(boost::filesystem::path module_path, std::string pass, std:
   if ((slot == nullptr) || (slot->token == nullptr)) {
     throw std::runtime_error("Couldn't find pkcs11 token");
   }
-
-  LOG_DEBUG << "Slot manufacturer......: " << slot->manufacturer;
-  LOG_DEBUG << "Slot description.......: " << slot->description;
-  LOG_DEBUG << "Slot token label.......: " << slot->token->label;
-  LOG_DEBUG << "Slot token manufacturer: " << slot->token->manufacturer;
-  LOG_DEBUG << "Slot token model.......: " << slot->token->model;
-  LOG_DEBUG << "Slot token serialnr....: " << slot->token->serialnr;
+  LOG_INFO << "DETSCH: NEW P11Engine";
+  LOG_INFO << "Slot manufacturer......: " << slot->manufacturer;
+  LOG_INFO << "Slot description.......: " << slot->description;
+  LOG_INFO << "Slot token label.......: " << slot->token->label;
+  LOG_INFO << "Slot token manufacturer: " << slot->token->manufacturer;
+  LOG_INFO << "Slot token model.......: " << slot->token->model;
+  LOG_INFO << "Slot token serialnr....: " << slot->token->serialnr;
 
   uri_prefix_ = std::string("pkcs11:serial=") + slot->token->serialnr + ";pin-value=" + pass_ + ";id=%";
 

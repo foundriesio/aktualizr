@@ -11,6 +11,7 @@ void Fetcher::fetchRole(std::string* result, int64_t maxsize, RepositoryType rep
     url += "/delegations";
   }
   url += "/" + version.RoleFileName(role);
+  std::cout << "fetchRole url " << url << std::endl;
   HttpResponse response = http->get(url, maxsize);
   if (!response.isOk()) {
     throw Uptane::MetadataFetchFailure(repo.ToString(), role.ToString());
