@@ -1,6 +1,7 @@
 #include "sqlstorage.h"
 
 #include <sys/stat.h>
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -10,6 +11,9 @@
 #include "logging/logging.h"
 #include "sql_utils.h"
 #include "utilities/utils.h"
+
+// Max events stored in the database, waiting to be sent
+#define MAX_PENDING_EVENTS 10000
 
 // Find metadata with version set to -1 (e.g. after migration) and assign proper version to it.
 void SQLStorage::cleanMetaVersion(Uptane::RepositoryType repo, const Uptane::Role& role) {
@@ -1569,6 +1573,24 @@ void SQLStorage::saveReportEvent(const Json::Value& json_value) {
   if (statement.step() != SQLITE_DONE) {
     LOG_ERROR << "Failed to save report event: " << db.errmsg();
     return;
+  }
+
+  statement = db.prepareStatement("SELECT COUNT(*) FROM report_events");
+  if (statement.step() != SQLITE_ROW) {
+    LOG_ERROR << "Failed to count report_events rows: " << db.errmsg();
+    return;
+  }
+
+  auto events_count = statement.get_result_col_int(0);
+  if (events_count > MAX_PENDING_EVENTS) {
+    LOG_WARNING << "There are too many pending events (" << events_count << "). Removing oldest ones";
+    auto del_statement = db.prepareStatement<int>(
+        "DELETE FROM report_events WHERE id NOT IN (SELECT id FROM report_events ORDER BY id DESC LIMIT ?)",
+        MAX_PENDING_EVENTS);
+    if (del_statement.step() != SQLITE_DONE) {
+      LOG_ERROR << "Failed to remove excess report events: " << db.errmsg();
+      return;
+    }
   }
 }
 
