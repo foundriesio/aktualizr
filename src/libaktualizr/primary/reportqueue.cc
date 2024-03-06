@@ -31,7 +31,17 @@ ReportQueue::~ReportQueue() {
   thread_.join();
 
   LOG_TRACE << "Flushing report queue";
-  flushQueue();
+  if (is_online_) {
+    flushQueue();
+  } else {
+    LOG_DEBUG << "Connection is down, skipping sending of pending events";
+  }
+}
+
+bool ReportQueue::checkConnectivity(const std::string& server) const {
+  (void)server;
+
+  return true;
 }
 
 void ReportQueue::run() {
@@ -40,7 +50,12 @@ void ReportQueue::run() {
   // succeeds.
   std::unique_lock<std::mutex> lock(m_);
   while (!shutdown_) {
-    flushQueue();
+    is_online_ = checkConnectivity(config.tls.server);
+    if (is_online_) {
+      flushQueue();
+    } else {
+      LOG_DEBUG << "Connection is down, do not sending events";
+    }
     cv_.wait_for(lock, std::chrono::seconds(run_pause_s_));
   }
 }

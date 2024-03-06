@@ -88,7 +88,7 @@ class ReportQueue {
  public:
   ReportQueue(const Config& config_in, std::shared_ptr<HttpInterface> http_client,
               std::shared_ptr<INvStorage> storage_in, int run_pause_s = 10, int event_number_limit = -1);
-  ~ReportQueue();
+  virtual ~ReportQueue();
   ReportQueue(const ReportQueue&) = delete;
   ReportQueue(ReportQueue&&) = delete;
   ReportQueue& operator=(const ReportQueue&) = delete;
@@ -98,6 +98,7 @@ class ReportQueue {
 
  private:
   void flushQueue();
+  virtual bool checkConnectivity(const std::string& server) const;
 
   const Config& config;
   std::shared_ptr<HttpInterface> http;
@@ -106,6 +107,7 @@ class ReportQueue {
   std::mutex m_;
   std::queue<std::unique_ptr<ReportEvent>> report_queue_;
   bool shutdown_{false};
+  bool is_online_{false};
   std::shared_ptr<INvStorage> storage;
   const int run_pause_s_;
   const int event_number_limit_;
