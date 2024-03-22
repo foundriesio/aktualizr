@@ -320,13 +320,21 @@ std::future<HttpResponse> HttpClient::downloadAsync(const std::string& url, curl
 
 bool HttpClient::updateHeader(const std::string& name, const std::string& value) {
   curl_slist* item = headers;
-  std::string lookfor(name + ": ");
+  std::string lookfor(name + ":");
+  std::string lookfor_empty(name + ";");
 
   while (item != nullptr) {
-    if (strncmp(lookfor.c_str(), item->data, lookfor.length()) == 0) {
+    if (strncmp(lookfor.c_str(), item->data, lookfor.length()) == 0 ||
+        strncmp(lookfor_empty.c_str(), item->data, lookfor_empty.length()) == 0) {
       free(item->data);  // NOLINT(cppcoreguidelines-no-malloc, hicpp-no-malloc)
-      lookfor += value;
-      item->data = strdup(lookfor.c_str());
+      std::string new_value{name};
+      if (!value.empty()) {
+        new_value += ": " + value;
+      } else {
+        // this is the way to make libcurl send a request header with an empty value in the `<header>:` format.
+        new_value += ";";
+      }
+      item->data = strdup(new_value.c_str());
       return true;
     }
     item = item->next;
