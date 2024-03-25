@@ -243,6 +243,36 @@ TEST(ReportQueue, LimitEventNumber) {
   }
 }
 
+TEST(ReportQueue, MaxStoredEvents) {
+  TemporaryDirectory temp_dir;
+  Config config;
+  config.storage.path = temp_dir.Path();
+  config.tls.server = "";
+  auto sql_storage = std::make_shared<SQLStorage>(config.storage, false);
+
+  const std::vector<std::tuple<uint, int>> test_cases{
+      {1, -1}, {1, 1}, {1, 2}, {10, -1}, {10, 1}, {10, 2}, {10, 3}, {10, 9}, {10, 10}, {10, 11},
+  };
+  // max_events_in_db must to be in sync with MAX_PENDING_EVENTS set in sqlstorage.cc
+  const auto max_events_in_db = 10000;
+  // How many excess events will be created, leading to the same number of deletions
+  const auto expected_deletions = 100;
+  for (uint ii = 0; ii < max_events_in_db + expected_deletions; ++ii) {
+    auto json = Utils::parseJSON(R"({"id": 0, "eventType": "some Event"})");
+    json["id"] = ii;
+    sql_storage->saveReportEvent(json);
+  }
+  Json::Value events{Json::arrayValue};
+  int64_t max_id;
+  sql_storage->loadReportEvents(&events, &max_id, max_events_in_db + expected_deletions);
+  // No more than max_events_in_db events should stay in the database
+  EXPECT_EQ(events.size(), max_events_in_db);
+  for (const auto &event : events) {
+    // Remaining events should all have a id >= expected_deletions. The ones with lower ids should be removed
+    EXPECT_GE(event["id"].asUInt(), expected_deletions);
+  }
+}
+
 TEST(ReportQueue, PayloadTooLarge) {
   TemporaryDirectory temp_dir;
   Config config;
