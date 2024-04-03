@@ -43,6 +43,7 @@ class Repo {
   void generateCampaigns() const;
   void refresh(const Uptane::Role &role);
   void rotate(const Uptane::Role &role, KeyType key_type = KeyType::kRSA2048);
+  KeyPair getKey(const Uptane::Role &role) const { return keys_.at(role); }
 
  protected:
   void generateRepoKeys(KeyType key_type);
