@@ -108,6 +108,7 @@ class ReportQueue {
   std::queue<std::unique_ptr<ReportEvent>> report_queue_;
   bool shutdown_{false};
   bool is_online_{false};
+  bool no_pending_events_{false};
   std::shared_ptr<INvStorage> storage;
   const int run_pause_s_;
   const int event_number_limit_;
