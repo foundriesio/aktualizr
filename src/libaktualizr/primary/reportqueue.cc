@@ -1,6 +1,7 @@
 #include "reportqueue.h"
 
 #include <chrono>
+#include <cstddef>
 
 #include "http/httpclient.h"
 #include "libaktualizr/config.h"
@@ -56,7 +57,13 @@ void ReportQueue::run() {
     } else {
       LOG_DEBUG << "Connection is down, do not sending events";
     }
-    cv_.wait_for(lock, std::chrono::seconds(run_pause_s_));
+    if (no_pending_events_) {
+      LOG_DEBUG << "ReportQueue: There are no events pending to be sent. Waiting until new events are generated";
+      cv_.wait(lock);
+    } else {
+      LOG_DEBUG << "ReportQueue: There may be events pending. Waiting up to " << run_pause_s_ << " seconds";
+      cv_.wait_for(lock, std::chrono::seconds(run_pause_s_));
+    }
   }
 }
 
@@ -64,6 +71,7 @@ void ReportQueue::enqueue(std::unique_ptr<ReportEvent> event) {
   {
     std::lock_guard<std::mutex> lock(m_);
     storage->saveReportEvent(event->toJson());
+    no_pending_events_ = false;
   }
   cv_.notify_all();
 }
@@ -87,7 +95,9 @@ void ReportQueue::flushQueue() {
     report_array.clear();
   }
 
-  if (!report_array.empty()) {
+  if (report_array.empty()) {
+    no_pending_events_ = true;
+  } else {
     HttpResponse response = http->post(config.tls.server + "/events", report_array);
 
     bool delete_events{response.isOk()};
@@ -112,6 +122,9 @@ void ReportQueue::flushQueue() {
       LOG_WARNING << "Failed to post update events: " << response.getStatusStr();
     }
     if (delete_events) {
+      if (report_array.size() < static_cast<size_t>(cur_event_number_limit_)) {
+        no_pending_events_ = true;
+      }
       report_array.clear();
       storage->deleteReportEvents(max_id);
       cur_event_number_limit_ = event_number_limit_;
