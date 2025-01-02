@@ -1121,16 +1121,29 @@ void SQLStorage::saveInstalledVersion(const std::string& ecu_serial, const Uptan
   }
 
   if (!!old_id) {
-    auto statement = db.prepareStatement<std::string, int, int, int64_t>(
-        "UPDATE installed_versions SET correlation_id = ?, is_current = ?, is_pending = ?, was_installed = ? WHERE id "
-        "= ?;",
-        target.correlation_id(), static_cast<int>(update_mode == InstalledVersionUpdateMode::kCurrent),
-        static_cast<int>(update_mode == InstalledVersionUpdateMode::kPending),
-        static_cast<int>(update_mode == InstalledVersionUpdateMode::kCurrent || old_was_installed), old_id.value());
+    if (update_mode == InstalledVersionUpdateMode::kBadTarget) {
+      // unset 'pending' and 'was_installed' for all installations of the target in the current ecu
+      auto statement = db.prepareStatement<std::string, std::string>(
+          "UPDATE installed_versions SET is_pending = 0, was_installed = 0 WHERE ecu_serial = ? AND name = ?",
+          ecu_serial_real, target.filename());
 
-    if (statement.step() != SQLITE_DONE) {
-      LOG_ERROR << "Failed to save installed versions: " << db.errmsg();
-      return;
+      if (statement.step() != SQLITE_DONE) {
+        LOG_ERROR << "Failed to save installed versions: " << db.errmsg();
+        return;
+      }
+    } else {
+      auto statement = db.prepareStatement<std::string, int, int, int64_t>(
+          "UPDATE installed_versions SET correlation_id = ?, is_current = ?, is_pending = ?, was_installed = ? WHERE "
+          "id "
+          "= ?;",
+          target.correlation_id(), static_cast<int>(update_mode == InstalledVersionUpdateMode::kCurrent),
+          static_cast<int>(update_mode == InstalledVersionUpdateMode::kPending),
+          static_cast<int>(update_mode == InstalledVersionUpdateMode::kCurrent || old_was_installed), old_id.value());
+
+      if (statement.step() != SQLITE_DONE) {
+        LOG_ERROR << "Failed to save installed versions: " << db.errmsg();
+        return;
+      }
     }
   } else {
     std::string custom = Utils::jsonToCanonicalStr(target.custom_data());

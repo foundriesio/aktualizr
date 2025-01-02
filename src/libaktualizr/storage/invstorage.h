@@ -36,7 +36,7 @@ struct MisconfiguredEcu {
   EcuState state;
 };
 
-enum class InstalledVersionUpdateMode { kNone, kCurrent, kPending };
+enum class InstalledVersionUpdateMode { kNone, kCurrent, kPending, kBadTarget };
 
 // Functions loading/storing multiple pieces of data are supposed to do so
 // atomically as far as implementation makes it possible.
