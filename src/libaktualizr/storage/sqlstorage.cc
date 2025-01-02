@@ -1193,7 +1193,7 @@ static void loadEcuMap(SQLite3Guard& db, std::string& ecu_serial, Uptane::EcuMap
 }
 
 bool SQLStorage::loadInstallationLog(const std::string& ecu_serial, std::vector<Uptane::Target>* log,
-                                     bool only_installed) const {
+                                     bool only_installed, bool include_current) const {
   SQLite3Guard db = dbConnection();
 
   std::string ecu_serial_real = ecu_serial;
@@ -1201,12 +1201,13 @@ bool SQLStorage::loadInstallationLog(const std::string& ecu_serial, std::vector<
   loadEcuMap(db, ecu_serial_real, ecu_map);
 
   std::string query =
-      "SELECT id, sha256, name, hashes, length, correlation_id, custom_meta FROM installed_versions WHERE "
-      "ecu_serial = ? ORDER BY id;";
+      std::string(
+          "SELECT id, sha256, name, hashes, length, correlation_id, custom_meta FROM installed_versions WHERE ") +
+      (include_current ? "" : " is_current = 0 AND ") + "ecu_serial = ? ORDER BY id;";
   if (only_installed) {
-    query =
-        "SELECT id, sha256, name, hashes, length, correlation_id, custom_meta FROM installed_versions WHERE "
-        "ecu_serial = ? AND was_installed = 1 ORDER BY id;";
+    query = std::string(
+                "SELECT id, sha256, name, hashes, length, correlation_id, custom_meta FROM installed_versions WHERE ") +
+            (include_current ? "" : " is_current = 0 AND ") + "ecu_serial = ? AND was_installed = 1 ORDER BY id;";
   }
 
   auto statement = db.prepareStatement<std::string>(query, ecu_serial_real);

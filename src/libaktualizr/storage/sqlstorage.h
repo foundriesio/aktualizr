@@ -80,8 +80,8 @@ class SQLStorage : public SQLStorageBase, public INvStorage {
                             InstalledVersionUpdateMode update_mode) override;
   bool loadInstalledVersions(const std::string& ecu_serial, boost::optional<Uptane::Target>* current_version,
                              boost::optional<Uptane::Target>* pending_version) const override;
-  bool loadInstallationLog(const std::string& ecu_serial, std::vector<Uptane::Target>* log,
-                           bool only_installed) const override;
+  bool loadInstallationLog(const std::string& ecu_serial, std::vector<Uptane::Target>* log, bool only_installed,
+                           bool include_current = true) const override;
   bool hasPendingInstall() override;
   void getPendingEcus(std::vector<std::pair<Uptane::EcuSerial, Hash>>* pendingEcus) override;
   void clearInstalledVersions() override;
