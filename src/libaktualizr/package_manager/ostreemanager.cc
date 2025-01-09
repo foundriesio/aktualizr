@@ -293,6 +293,25 @@ OstreeManager::OstreeManager(const PackageConfig &pconfig, const BootloaderConfi
   if (imageUpdated()) {
     bootloader_->setBootOK();
   }
+
+  if (pconfig.booted == BootedType::kStaged) {
+    auto ostree_hash_file = bconfig.reboot_sentinel_dir / "staged_booted_ostree_hash";
+    bool reboot_needed;
+    storage_->loadNeedReboot(&reboot_needed);
+    bool reboot_pending = reboot_needed && !bootloader_->rebootDetected();
+    if (!reboot_pending) {
+      // If there is no reboot pending, assume the system is running the latest sysroot deployment
+      bootedStagedOstreeHash = getCurrentHash();
+      Utils::writeFile(ostree_hash_file, bootedStagedOstreeHash, false);
+      LOG_DEBUG << "OstreeManager: Saving ostree hash " << bootedStagedOstreeHash;
+    } else {
+      // If there a reboot pending, use the latest hash recorded when there was no reboot pending
+      if (boost::filesystem::exists(ostree_hash_file)) {
+        bootedStagedOstreeHash = Utils::readFile(ostree_hash_file, true);
+        LOG_DEBUG << "OstreeManager: Reading ostree hash " << bootedStagedOstreeHash;
+      }
+    }
+  }
 }
 
 OstreeManager::~OstreeManager() { bootloader_.reset(nullptr); }
@@ -389,7 +408,13 @@ std::string OstreeManager::getCurrentHash() const {
 }
 
 Uptane::Target OstreeManager::getCurrent() const {
-  const std::string current_hash = getCurrentHash();
+  std::string current_hash;
+  if (config.booted == BootedType::kStaged && !bootedStagedOstreeHash.empty()) {
+    current_hash = bootedStagedOstreeHash;
+  } else {
+    current_hash = getCurrentHash();
+  }
+
   boost::optional<Uptane::Target> current_version;
   // This may appear Primary-specific, but since Secondaries only know about
   // themselves, this actually works just fine for them, too.

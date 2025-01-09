@@ -78,6 +78,7 @@ class OstreeManager : public PackageManagerInterface {
   TargetStatus verifyTargetInternal(const Uptane::Target &target) const;
 
   std::unique_ptr<Bootloader> bootloader_;
+  std::string bootedStagedOstreeHash;
 };
 
 #endif  // OSTREE_H_
