@@ -1,4 +1,5 @@
 find_program(ASN1C NAMES asn1c)
+find_program(SED NAMES sed)
 
 if(ASN1C MATCHES ".*-NOTFOUND")
     message(ERROR "asn1c not found")
@@ -44,6 +45,15 @@ function(compile_asn1_lib)
         WORKING_DIRECTORY ${ASN1_GEN_DIR}
         DEPENDS ${S}
         )
+
+    # Replace absolute path with relative path in asn1c output files, to avoid TMPDIR reference warnings in Yocto
+    file(GLOB ASN1_ALL_GENERATED_FILES ${ASN1_GEN_DIR}/*.c ${ASN1_GEN_DIR}/*.h)
+    foreach(GENERATED_FILE ${ASN1_ALL_GENERATED_FILES})
+        execute_process(COMMAND ${SED} -i "s|${CMAKE_CURRENT_SOURCE_DIR}/||" ${GENERATED_FILE}
+            WORKING_DIRECTORY ${ASN1_GEN_DIR}
+            OUTPUT_QUIET
+            )
+    endforeach(GENERATED_FILE ${ASN1_GENERATED})
 
     list(REMOVE_ITEM ASN1_GENERATED ${ASN1_GEN_DIR}/converter-example.c ${ASN1_GEN_DIR}/converter-sample.c)
 
