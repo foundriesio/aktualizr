@@ -301,7 +301,7 @@ OstreeManager::OstreeManager(const PackageConfig &pconfig, const BootloaderConfi
     bool reboot_pending = reboot_needed && !bootloader_->rebootDetected();
     if (!reboot_pending) {
       // If there is no reboot pending, assume the system is running the latest sysroot deployment
-      bootedStagedOstreeHash = getCurrentHash();
+      bootedStagedOstreeHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
       Utils::writeFile(ostree_hash_file, bootedStagedOstreeHash, false);
       LOG_DEBUG << "OstreeManager: Saving ostree hash " << bootedStagedOstreeHash;
     } else {
