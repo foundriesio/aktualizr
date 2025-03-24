@@ -93,13 +93,12 @@ data::InstallationResult OstreeManager::pull(const boost::filesystem::path &sysr
     return data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Could not get OSTree repo");
   }
 
-  GHashTable *ref_list = nullptr;
-  if (ostree_repo_list_commit_objects_starting_with(repo.get(), refhash.c_str(), &ref_list, nullptr, &error) != 0) {
-    guint length = g_hash_table_size(ref_list);
-    g_hash_table_destroy(ref_list);  // OSTree creates the table with destroy notifiers, so no memory leaks expected
-    // should never be greater than 1, but use >= for robustness
-    if (length >= 1) {
-      LOG_DEBUG << "refhash already pulled";
+  OstreeRepoCommitState commit_state;
+  if (ostree_repo_load_commit(repo.get(), refhash.c_str(), nullptr, &commit_state, &error)) {
+    if (commit_state & OSTREE_REPO_COMMIT_STATE_PARTIAL || commit_state & OSTREE_REPO_COMMIT_STATE_FSCK_PARTIAL) {
+      LOG_INFO << "OSTree commit " << refhash << " is partially pulled. Re-pulling it";
+    } else {
+      LOG_DEBUG << "OSTree commit " << refhash << " is fully pulled";
       return data::InstallationResult(true, data::ResultCode::Numeric::kAlreadyProcessed, "Refhash was already pulled");
     }
   }
