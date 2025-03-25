@@ -346,21 +346,21 @@ TargetStatus OstreeManager::verifyTargetInternal(const Uptane::Target &target) c
     return TargetStatus::kNotFound;
   }
 
-  GHashTable *ref_list = nullptr;
-  if (ostree_repo_list_commit_objects_starting_with(repo.get(), refhash.c_str(), &ref_list, nullptr, &error) != 0) {
-    guint length = g_hash_table_size(ref_list);
-    g_hash_table_destroy(ref_list);  // OSTree creates the table with destroy notifiers, so no memory leaks expected
-    // should never be greater than 1, but use >= for robustness
-    if (length >= 1) {
+  OstreeRepoCommitState commit_state;
+  if (ostree_repo_load_commit(repo.get(), refhash.c_str(), nullptr, &commit_state, &error)) {
+    if (commit_state & OSTREE_REPO_COMMIT_STATE_PARTIAL || commit_state & OSTREE_REPO_COMMIT_STATE_FSCK_PARTIAL) {
+      LOG_ERROR << "OSTree commit " << refhash << " is incomplete";
+    } else {
       return TargetStatus::kGood;
     }
+  } else {
+    LOG_ERROR << "Could not find OSTree commit " << refhash;
   }
   if (error != nullptr) {
     g_error_free(error);
     error = nullptr;
   }
 
-  LOG_ERROR << "Could not find OSTree commit";
   return TargetStatus::kNotFound;
 }
 
