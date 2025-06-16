@@ -68,14 +68,14 @@ int main(int argc, char **argv) {
 
   std::string port = TestUtils::getFreePort();
   server += port;
-  boost::process::child http_server_process("tests/fake_http_server/fake_test_server.py", port, "-m", meta_dir.Path());
+  bp::child http_server_process("tests/fake_http_server/fake_test_server.py", port, "-m", meta_dir.Path());
   TestUtils::waitForServer(server + "/");
   std::string treehub_port = TestUtils::getFreePort();
   treehub_server += treehub_port;
   TemporaryDirectory treehub_dir;
-  boost::process::child ostree_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), treehub_port,
-                                              std::string("-d"), treehub_dir.PathString(), std::string("-s0.5"),
-                                              std::string("--create"));
+  bp::child ostree_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), treehub_port,
+                                  std::string("-d"), treehub_dir.PathString(), std::string("-s0.5"),
+                                  std::string("--create"));
   TestUtils::waitForServer(treehub_server + "/");
 
   Process uptane_gen(uptane_generator_path.string());

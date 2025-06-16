@@ -72,8 +72,8 @@ TEST(http_repo, bad_connection) {
   TemporaryDirectory src_dir, dst_dir;
   std::string sp = TestUtils::getFreePort();
 
-  boost::process::child server_process("tests/sota_tools/treehub_server.py", std::string("-p"), sp, std::string("-d"),
-                                       src_dir.PathString(), std::string("-f2"), std::string("--create"));
+  bp::child server_process("tests/sota_tools/treehub_server.py", std::string("-p"), sp, std::string("-d"),
+                           src_dir.PathString(), std::string("-f2"), std::string("--create"));
   TestUtils::waitForServer("http://localhost:" + sp + "/");
 
   TreehubServer server;
@@ -84,9 +84,8 @@ TEST(http_repo, bad_connection) {
   Json::Value auth;
   auth["ostree"]["server"] = std::string("https://localhost:") + dp;
   Utils::writeFile(dst_dir.Path() / "auth.json", auth);
-  boost::process::child deploy_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), dp,
-                                              std::string("-d"), dst_dir.PathString(), std::string("-f2"),
-                                              std::string("--tls"));
+  bp::child deploy_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), dp, std::string("-d"),
+                                  dst_dir.PathString(), std::string("-f2"), std::string("--tls"));
   TestUtils::waitForServer("https://localhost:" + dp + "/");
 
   boost::filesystem::path filepath = (dst_dir.Path() / "auth.json").string();
@@ -124,7 +123,7 @@ int main(int argc, char **argv) {
   std::string server = "tests/sota_tools/treehub_server.py";
   port = TestUtils::getFreePort();
 
-  boost::process::child server_process(server, std::string("-p"), port, std::string("--create"));
+  bp::child server_process(server, std::string("-p"), port, std::string("--create"));
   TestUtils::waitForServer("http://localhost:" + port + "/");
 
   return RUN_ALL_TESTS();

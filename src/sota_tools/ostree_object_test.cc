@@ -172,8 +172,8 @@ TEST(OstreeObject, UploadSuccess) {
   Json::Value auth;
   auth["ostree"]["server"] = std::string("https://localhost:") + dp;
   Utils::writeFile(temp_dir.Path() / "auth.json", auth);
-  boost::process::child deploy_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), dp,
-                                              std::string("-d"), temp_dir.Path().string(), std::string("--tls"));
+  bp::child deploy_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), dp, std::string("-d"),
+                                  temp_dir.Path().string(), std::string("--tls"));
   TestUtils::waitForServer("https://localhost:" + dp + "/");
 
   TreehubServer push_server;
@@ -230,8 +230,7 @@ int main(int argc, char** argv) {
   TemporaryDirectory repo_dir;
   repo_path = repo_dir.PathString();
 
-  boost::process::child server_process(server, std::string("-p"), port, std::string("-d"), repo_path,
-                                       std::string("--create"));
+  bp::child server_process(server, std::string("-p"), port, std::string("-d"), repo_path, std::string("--create"));
   TestUtils::waitForServer("http://localhost:" + port + "/");
 
   return RUN_ALL_TESTS();

@@ -49,7 +49,7 @@ class TufRepoMock {
   ImageRepo repo_;
   std::string port_;
   std::string url_;
-  boost::process::child process_;
+  bp::child process_;
 };
 
 class Treehub {
@@ -92,7 +92,7 @@ class Treehub {
   const std::string root_dir_;
   std::string port_;
   std::string url_;
-  boost::process::child process_;
+  bp::child process_;
 };
 
 class ComposeAppPackManMock : public OstreeManager {

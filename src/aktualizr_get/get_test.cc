@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <boost/process.hpp>
-
 #include "get.h"
 #include "test_utils.h"
 
@@ -23,7 +21,7 @@ int main(int argc, char **argv) {
 
   std::string port = TestUtils::getFreePort();
   server += port;
-  boost::process::child server_process("tests/fake_http_server/fake_test_server.py", port);
+  bp::child server_process("tests/fake_http_server/fake_test_server.py", port);
   TestUtils::waitForServer(server + "/");
   return RUN_ALL_TESTS();
 }

@@ -3,7 +3,6 @@
 #include <ostree.h>
 
 #include "boost/algorithm/string/trim.hpp"
-#include "boost/process.hpp"
 
 #include "logging/logging.h"
 #include "test_utils.h"
@@ -45,7 +44,7 @@ class Treehub {
   TemporaryDirectory root_dir_;
   const std::string port_;
   const std::string url_;
-  boost::process::child process_;
+  bp::child process_;
   std::string cur_rev_;
 };
 
