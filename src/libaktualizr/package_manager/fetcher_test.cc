@@ -365,15 +365,15 @@ int main(int argc, char** argv) {
 
   std::string port = TestUtils::getFreePort();
   server += port;
-  boost::process::child http_server_process("tests/fake_http_server/fake_test_server.py", port, "-f");
+  bp::child http_server_process("tests/fake_http_server/fake_test_server.py", port, "-f");
   TestUtils::waitForServer(server + "/");
 #ifdef BUILD_OSTREE
   std::string treehub_port = TestUtils::getFreePort();
   treehub_server += treehub_port;
   TemporaryDirectory treehub_dir;
-  boost::process::child ostree_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), treehub_port,
-                                              std::string("-d"), treehub_dir.PathString(), std::string("-s0.5"),
-                                              std::string("--create"));
+  bp::child ostree_server_process("tests/sota_tools/treehub_server.py", std::string("-p"), treehub_port,
+                                  std::string("-d"), treehub_dir.PathString(), std::string("-s0.5"),
+                                  std::string("--create"));
   TemporaryDirectory temp_dir;
   int r = system((std::string("ostree admin init-fs ") + temp_dir.PathString()).c_str());
   if (r != 0) {

@@ -52,8 +52,8 @@ int main(int argc, char **argv) {
   auth["ostree"]["server"] = std::string("https://localhost:") + port;
   Utils::writeFile(temp_dir.Path() / "auth.json", auth);
 
-  boost::process::child server_process(server, std::string("-p"), port, std::string("-d"), temp_dir.PathString(),
-                                       std::string("--tls"));
+  bp::child server_process(server, std::string("-p"), port, std::string("-d"), temp_dir.PathString(),
+                           std::string("--tls"));
   TestUtils::waitForServer("https://localhost:" + port + "/");
   return RUN_ALL_TESTS();
 }

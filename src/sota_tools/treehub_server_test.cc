@@ -67,7 +67,7 @@ int main(int argc, char **argv) {
   std::string server = "tests/sota_tools/headers_response_server.py";
   port = TestUtils::getFreePort();
 
-  boost::process::child server_process(server, port);
+  bp::child server_process(server, port);
   TestUtils::waitForServer("http://127.0.0.1:" + port + "/");
 
   return RUN_ALL_TESTS();

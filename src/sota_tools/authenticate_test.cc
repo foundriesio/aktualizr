@@ -123,9 +123,8 @@ int main(int argc, char **argv) {
   }
   certs_dir = argv[1];
 
-  boost::process::child server_process("tests/sota_tools/authentication/tls_server.py", "1443", certs_dir);
-  boost::process::child server_noauth_process("tests/sota_tools/authentication/tls_server.py", "--noauth", "2443",
-                                              certs_dir);
+  bp::child server_process("tests/sota_tools/authentication/tls_server.py", "1443", certs_dir);
+  bp::child server_noauth_process("tests/sota_tools/authentication/tls_server.py", "--noauth", "2443", certs_dir);
   // TODO: this do not work because the server expects auth! Let's sleep for now.
   // (could be replaced by a check with raw tcp)
   // TestUtils::waitForServer("https://localhost:1443/");

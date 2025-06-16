@@ -9,13 +9,13 @@
 #endif
 #include <chrono>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <string>
 #include <thread>
 
 #include <boost/asio/io_context.hpp>
 #include <boost/filesystem.hpp>
-#include <boost/process.hpp>
 
 #include "logging/logging.h"
 
@@ -95,11 +95,10 @@ Process::Result Process::spawn(const std::string &executable_to_run, const std::
     if (boost::filesystem::exists(executable_to_run)) {
       executable_path = executable_to_run;
     } else {
-      executable_path = boost::process::search_path(executable_to_run).string();
+      executable_path = bp::search_path(executable_to_run).string();
     }
-    boost::process::child child_process(boost::process::exe = executable_path, boost::process::args = executable_args,
-                                        boost::process::std_out > output, boost::process::std_err > err_output,
-                                        boost::process::on_exit = child_process_exit_code, io_context);
+    bp::child child_process(bp::exe = executable_path, bp::args = executable_args, bp::std_out > output,
+                            bp::std_err > err_output, bp::on_exit = child_process_exit_code, io_context);
 
     io_context.run();
 

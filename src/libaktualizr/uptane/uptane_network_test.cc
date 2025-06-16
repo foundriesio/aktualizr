@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
   logger_set_threshold(boost::log::trivial::trace);
 
   port = TestUtils::getFreePort();
-  boost::process::child server_process("tests/fake_http_server/fake_uptane_server.py", port);
+  bp::child server_process("tests/fake_http_server/fake_uptane_server.py", port);
   TestUtils::waitForServer("http://127.0.0.1:" + port + "/");
 
   conf.provision.server = "http://127.0.0.1:" + port;

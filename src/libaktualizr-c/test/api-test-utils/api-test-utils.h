@@ -6,7 +6,7 @@
 #include "libaktualizr/config.h"
 
 using Config = Config;
-using FakeHttpServer = boost::process::child;
+using FakeHttpServer = bp::child;
 
 extern "C" {
 #else
