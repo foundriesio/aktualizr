@@ -461,7 +461,7 @@ bool OstreeManager::imageUpdated() {
   GPtrArray *deployments = ostree_sysroot_get_deployments(sysroot_smart.get());
 
   OstreeDeployment *pending_deployment = nullptr;
-  ostree_sysroot_query_deployments_for(sysroot_smart.get(), nullptr, &pending_deployment, nullptr);
+  ostree_sysroot_query_deployments_for(sysroot_smart.get(), config.os.c_str(), &pending_deployment, nullptr);
 
   bool pending_found = false;
   for (guint i = 0; i < deployments->len; i++) {
