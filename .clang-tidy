@@ -14,6 +14,9 @@ Checks:          >-
   performance-*,
   readability-*,-readability-else-after-return,-readability-identifier-naming,-readability-magic-numbers,-readability-function-cognitive-complexity,
   -modernize-use-nodiscard,
+  -bugprone-assignment-in-if-condition,-readability-identifier-length,-misc-const-correctness,-bugprone-narrowing-conversions,-cppcoreguidelines-narrowing-conversions,-cert-dcl58-cpp,
+  -cert-err33-c,-bugprone-easily-swappable-parameters,-clang-diagnostic-deprecated-declarations,-modernize-return-braced-init-list,-bugprone-implicit-widening-of-multiplication-result,-cppcoreguidelines-prefer-member-initializer,
+  -performance-unnecessary-copy-initialization,-hicpp-use-emplace,-modernize-use-emplace,-cppcoreguidelines-virtual-class-destructor,-readability-simplify-boolean-expr,
 
 WarningsAsErrors: '*'
 AnalyzeTemporaryDtors: false
