@@ -39,7 +39,11 @@ void BaseConfig::updateFromDirs(const std::vector<boost::filesystem::path>& conf
     }
   }
   for (const auto& config_file : configs_map) {
-    updateFromToml(config_file.second);
+    if (!boost::filesystem::exists(config_file.second)) {
+      LOG_ERROR << "Config file " << config_file.second << " does not exist.";
+    } else {
+      updateFromToml(config_file.second);
+    }
   }
 }
 
