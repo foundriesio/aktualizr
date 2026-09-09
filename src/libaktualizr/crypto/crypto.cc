@@ -141,6 +141,9 @@ std::string Crypto::sha512digestHex(const std::string &text) {
 std::string Crypto::RSAPSSSign(ENGINE *engine, const std::string &private_key, const std::string &message) {
   StructGuard<EVP_PKEY> key(nullptr, EVP_PKEY_free);
   StructGuard<RSA> rsa(nullptr, RSA_free);
+#ifndef BUILD_P11
+  (void)engine;
+#else
   if (engine != nullptr) {
     // TODO(OTA-2138): this call leaks memory somehow...
     key.reset(ENGINE_load_private_key(engine, private_key.c_str(), nullptr, nullptr));
@@ -155,7 +158,9 @@ std::string Crypto::RSAPSSSign(ENGINE *engine, const std::string &private_key, c
       LOG_ERROR << "EVP_PKEY_get1_RSA failed with error " << ERR_error_string(ERR_get_error(), nullptr);
       return std::string();
     }
-  } else {
+  } else
+#endif
+  {
     StructGuard<BIO> bio(BIO_new_mem_buf(const_cast<char *>(private_key.c_str()), static_cast<int>(private_key.size())),
                          BIO_vfree);
     key.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
