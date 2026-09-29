@@ -12,17 +12,30 @@
 #include <string>     // for string
 
 #include "libaktualizr/types.h"  // for Hash, KeyType, Hash::Type
-#include "utilities/utils.h"     // for StructGuard
+#include "openssl_compat.h"
+#include "utilities/utils.h"  // for StructGuard
 
-#include <openssl/engine.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/pem.h>
+
+#if !AKTUALIZR_OPENSSL_NO_ENGINE
+#include <openssl/engine.h>
+#endif
 
 // some older versions of openssl have BIO_new_mem_buf defined with first parameter of type (void*)
 //   which is not true and breaks our build
 #undef BIO_new_mem_buf
 BIO *BIO_new_mem_buf(const void *, int);  // NOLINT(readability-redundant-declaration)
+
+// The PKCS#11 signing key handle: an OpenSSL ENGINE on OpenSSL < 4.0, or an EVP_PKEY obtained via
+// P11Engine::loadPrivateKey() on OpenSSL >= 4.0. A null value means "no PKCS#11 key, use the
+// software/file private key instead".
+#if AKTUALIZR_OPENSSL_NO_ENGINE
+using P11KeyHandle = EVP_PKEY *;
+#else
+using P11KeyHandle = ENGINE *;
+#endif
 
 class MultiPartHasher {
  public:
@@ -85,8 +98,9 @@ class Crypto {
   static std::string sha512digest(const std::string &text);
   /** A lower case, hexadecimal version of sha512digest */
   static std::string sha512digestHex(const std::string &text);
-  static std::string RSAPSSSign(ENGINE *engine, const std::string &private_key, const std::string &message);
-  static std::string Sign(KeyType key_type, ENGINE *engine, const std::string &private_key, const std::string &message);
+  static std::string RSAPSSSign(P11KeyHandle p11_key, const std::string &private_key, const std::string &message);
+  static std::string Sign(KeyType key_type, P11KeyHandle p11_key, const std::string &private_key,
+                          const std::string &message);
   static std::string ED25519Sign(const std::string &private_key, const std::string &message);
   static bool parseP12(BIO *p12_bio, const std::string &p12_password, std::string *out_pkey, std::string *out_cert,
                        std::string *out_ca);

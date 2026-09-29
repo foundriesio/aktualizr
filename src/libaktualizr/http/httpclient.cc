@@ -6,7 +6,16 @@
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
 
+#include "crypto/openssl_compat.h"
 #include "utilities/utils.h"
+
+// On OpenSSL >= 4.0 curl loads "pkcs11:" TLS cert/key URIs through the pkcs11-provider ("PROV")
+// rather than the pkcs11 engine ("ENG"); the ENGINE API is gone in OpenSSL 4.0.
+#if AKTUALIZR_OPENSSL_NO_ENGINE
+static constexpr const char* kPkcs11CurlType = "PROV";
+#else
+static constexpr const char* kPkcs11CurlType = "ENG";
+#endif
 
 struct WriteStringArg {
   std::string out;
@@ -141,7 +150,7 @@ void HttpClient::setCerts(const std::string& ca, CryptoSource ca_source, const s
 
   if (cert_source == CryptoSource::kPkcs11) {
     curlEasySetoptWrapper(curl, CURLOPT_SSLCERT, cert.c_str());
-    curlEasySetoptWrapper(curl, CURLOPT_SSLCERTTYPE, "ENG");
+    curlEasySetoptWrapper(curl, CURLOPT_SSLCERTTYPE, kPkcs11CurlType);
   } else {  // cert_source == CryptoSource::kFile
     std::unique_ptr<TemporaryFile> tmp_cert_file = std_::make_unique<TemporaryFile>("tls-cert");
     tmp_cert_file->PutContents(cert);
@@ -152,10 +161,12 @@ void HttpClient::setCerts(const std::string& ca, CryptoSource ca_source, const s
   pkcs11_cert = (cert_source == CryptoSource::kPkcs11);
 
   if (pkey_source == CryptoSource::kPkcs11) {
+#if !AKTUALIZR_OPENSSL_NO_ENGINE
     curlEasySetoptWrapper(curl, CURLOPT_SSLENGINE, "pkcs11");
     curlEasySetoptWrapper(curl, CURLOPT_SSLENGINE_DEFAULT, 1L);
+#endif
     curlEasySetoptWrapper(curl, CURLOPT_SSLKEY, pkey.c_str());
-    curlEasySetoptWrapper(curl, CURLOPT_SSLKEYTYPE, "ENG");
+    curlEasySetoptWrapper(curl, CURLOPT_SSLKEYTYPE, kPkcs11CurlType);
   } else {  // pkey_source == CryptoSource::kFile
     std::unique_ptr<TemporaryFile> tmp_pkey_file = std_::make_unique<TemporaryFile>("tls-pkey");
     tmp_pkey_file->PutContents(pkey);
@@ -172,7 +183,7 @@ HttpResponse HttpClient::get(const std::string& url, int64_t maxsize) {
   curlEasySetoptWrapper(curl_get, CURLOPT_HTTPHEADER, headers);
 
   if (pkcs11_cert) {
-    curlEasySetoptWrapper(curl_get, CURLOPT_SSLCERTTYPE, "ENG");
+    curlEasySetoptWrapper(curl_get, CURLOPT_SSLCERTTYPE, kPkcs11CurlType);
   }
 
   // Clear POSTFIELDS to remove any lingering references to strings that have

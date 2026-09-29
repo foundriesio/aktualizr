@@ -68,11 +68,13 @@ std::string P11Crypto::pass_{"1234"};
 std::string P11Crypto::label_{"Virtual token"};
 std::shared_ptr<P11EngineGuard> P11Crypto::p11_{nullptr};
 
+#if !AKTUALIZR_OPENSSL_NO_ENGINE
 TEST(crypto, findPkcsLibrary) {
   const boost::filesystem::path pkcs11Path = P11Engine::findPkcsLibrary();
   EXPECT_NE(pkcs11Path, "");
   EXPECT_TRUE(boost::filesystem::exists(pkcs11Path));
 }
+#endif
 
 /* Sign and verify a file with RSA via PKCS#11. */
 TEST_F(P11Crypto, sign_verify_rsa_p11) {
@@ -82,8 +84,15 @@ TEST_F(P11Crypto, sign_verify_rsa_p11) {
   std::string key_content;
   EXPECT_TRUE((*p11_)->readUptanePublicKey(uptane_key_id, &key_content));
   PublicKey pkey(key_content, KeyType::kRSA2048);
+#if AKTUALIZR_OPENSSL_NO_ENGINE
+  EVP_PKEY *p11_key = (*p11_)->loadPrivateKey(uptane_key_id);
+  ASSERT_NE(p11_key, nullptr);
+  std::string signature = Utils::toBase64(Crypto::RSAPSSSign(p11_key, "", text));
+  EVP_PKEY_free(p11_key);
+#else
   std::string private_key = (*p11_)->getItemFullId(uptane_key_id);
   std::string signature = Utils::toBase64(Crypto::RSAPSSSign((*p11_)->getEngine(), private_key, text));
+#endif
   bool signe_is_ok = pkey.VerifySignature(signature, text);
   EXPECT_TRUE(signe_is_ok);
 }

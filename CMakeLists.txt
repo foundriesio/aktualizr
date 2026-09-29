@@ -113,26 +113,30 @@ if(BUILD_P11)
     find_package(LibP11 REQUIRED)
     add_definitions(-DBUILD_P11)
 
-    if (NOT PKCS11_ENGINE_PATH)
-        if (CMAKE_CROSSCOMPILING)
-            message(FATAL_ERROR "Please define the PKCS11_ENGINE_PATH on your target system")
-        endif()
-        foreach(engine IN ITEMS "/usr/lib/engines-1.1/pkcs11.so"
-                "/usr/lib/engines/pkcs11.so"
-                "/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so"
-                "/usr/lib/arm-linux-gnueabihf/engines-1.1/pkcs11.so")
-
-            if(EXISTS ${engine})
-                message(STATUS "Detected pkcs11 engine path: ${engine}")
-                set(PKCS11_ENGINE_PATH ${engine})
-            endif()
-        endforeach()
-
+    # The pkcs11 engine path is only needed for the ENGINE-based PKCS#11 support used with
+    # OpenSSL < 4.0 (see AKTUALIZR_OPENSSL_NO_ENGINE).
+    if (OPENSSL_VERSION VERSION_LESS 4.0)
         if (NOT PKCS11_ENGINE_PATH)
-            message(FATAL_ERROR "Could not auto-detect path of PKCS11 engine, please specify PKCS11_ENGINE_PATH")
-        endif()
+            if (CMAKE_CROSSCOMPILING)
+                message(FATAL_ERROR "Please define the PKCS11_ENGINE_PATH on your target system")
+            endif()
+            foreach(engine IN ITEMS "/usr/lib/engines-1.1/pkcs11.so"
+                    "/usr/lib/engines/pkcs11.so"
+                    "/usr/lib/x86_64-linux-gnu/engines-1.1/pkcs11.so"
+                    "/usr/lib/arm-linux-gnueabihf/engines-1.1/pkcs11.so")
 
-        set(PKCS11_ENGINE_PATH "${PKCS11_ENGINE_PATH}" CACHE STRING "Path to PKCS#11 engine library")
+                if(EXISTS ${engine})
+                    message(STATUS "Detected pkcs11 engine path: ${engine}")
+                    set(PKCS11_ENGINE_PATH ${engine})
+                endif()
+            endforeach()
+
+            if (NOT PKCS11_ENGINE_PATH)
+                message(FATAL_ERROR "Could not auto-detect path of PKCS11 engine, please specify PKCS11_ENGINE_PATH")
+            endif()
+
+            set(PKCS11_ENGINE_PATH "${PKCS11_ENGINE_PATH}" CACHE STRING "Path to PKCS#11 engine library")
+        endif()
     endif()
 endif(BUILD_P11)
 

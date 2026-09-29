@@ -6,6 +6,7 @@
 #include <string>
 
 #include <openssl/pkcs12.h>
+#include <openssl/rand.h>
 #include <openssl/rsa.h>
 #include <sodium.h>
 #include <boost/algorithm/hex.hpp>
@@ -138,14 +139,52 @@ std::string Crypto::sha512digestHex(const std::string &text) {
   return boost::algorithm::to_lower_copy(boost::algorithm::hex(sha512digest(text)));
 }
 
-std::string Crypto::RSAPSSSign(ENGINE *engine, const std::string &private_key, const std::string &message) {
+#if AKTUALIZR_OPENSSL_NO_ENGINE
+// Signs with a PKCS#11 private key (see P11Engine::loadPrivateKey()) through the high-level EVP API, so the
+// RSA-PSS operation is performed by the token. OpenSSL >= 4.0 counterpart of the ENGINE-based path below.
+static std::string RSAPSSSignP11(EVP_PKEY *p11_key, const std::string &message) {
+  StructGuard<EVP_MD_CTX> mdctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);
+  EVP_PKEY_CTX *pctx = nullptr;
+  if (EVP_DigestSignInit(mdctx.get(), &pctx, EVP_sha256(), nullptr, p11_key) <= 0) {
+    LOG_ERROR << "EVP_DigestSignInit failed with error " << ERR_error_string(ERR_get_error(), nullptr);
+    return std::string();
+  }
+  if (EVP_PKEY_CTX_set_rsa_padding(pctx, RSA_PKCS1_PSS_PADDING) <= 0 ||
+      EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, RSA_PSS_SALTLEN_DIGEST) <= 0 ||
+      EVP_PKEY_CTX_set_rsa_mgf1_md(pctx, EVP_sha256()) <= 0) {
+    LOG_ERROR << "Couldn't configure RSA-PSS padding for PKCS#11 signing: "
+              << ERR_error_string(ERR_get_error(), nullptr);
+    return std::string();
+  }
+
+  size_t siglen = 0;
+  const auto *msg = reinterpret_cast<const unsigned char *>(message.c_str());
+  if (EVP_DigestSign(mdctx.get(), nullptr, &siglen, msg, message.size()) <= 0) {
+    LOG_ERROR << "EVP_DigestSign (size query) failed with error " << ERR_error_string(ERR_get_error(), nullptr);
+    return std::string();
+  }
+  std::string signature(siglen, '\0');
+  auto *sigbuf = reinterpret_cast<unsigned char *>(&signature[0]);
+  if (EVP_DigestSign(mdctx.get(), sigbuf, &siglen, msg, message.size()) <= 0) {
+    LOG_ERROR << "EVP_DigestSign failed with error " << ERR_error_string(ERR_get_error(), nullptr);
+    return std::string();
+  }
+  signature.resize(siglen);
+  return signature;
+}
+#endif
+
+std::string Crypto::RSAPSSSign(P11KeyHandle p11_key, const std::string &private_key, const std::string &message) {
+#if AKTUALIZR_OPENSSL_NO_ENGINE
+  if (p11_key != nullptr) {
+    return RSAPSSSignP11(p11_key, message);
+  }
+#endif
   StructGuard<EVP_PKEY> key(nullptr, EVP_PKEY_free);
   StructGuard<RSA> rsa(nullptr, RSA_free);
-  if (engine != nullptr) {
-#ifdef BUILD_P11
-#if OPENSSL_VERSION_MAJOR >= 4
-#error "PKCS#11 support uses the OpenSSL ENGINE API, which OpenSSL 4.0 removed; build without BUILD_P11"
-#endif
+#if !AKTUALIZR_OPENSSL_NO_ENGINE
+  if (p11_key != nullptr) {
+    ENGINE *engine = p11_key;
     // TODO(OTA-2138): this call leaks memory somehow...
     key.reset(ENGINE_load_private_key(engine, private_key.c_str(), nullptr, nullptr));
 
@@ -159,11 +198,9 @@ std::string Crypto::RSAPSSSign(ENGINE *engine, const std::string &private_key, c
       LOG_ERROR << "EVP_PKEY_get1_RSA failed with error " << ERR_error_string(ERR_get_error(), nullptr);
       return std::string();
     }
-#else
-    LOG_ERROR << "Built without PKCS#11 support, cannot load the private key from an engine";
-    return std::string();
+  } else
 #endif
-  } else {
+  {
     StructGuard<BIO> bio(BIO_new_mem_buf(const_cast<char *>(private_key.c_str()), static_cast<int>(private_key.size())),
                          BIO_vfree);
     key.reset(PEM_read_bio_PrivateKey(bio.get(), nullptr, nullptr, nullptr));
@@ -205,11 +242,12 @@ std::string Crypto::RSAPSSSign(ENGINE *engine, const std::string &private_key, c
   return retval;
 }
 
-std::string Crypto::Sign(KeyType key_type, ENGINE *engine, const std::string &private_key, const std::string &message) {
+std::string Crypto::Sign(KeyType key_type, P11KeyHandle p11_key, const std::string &private_key,
+                         const std::string &message) {
   if (key_type == KeyType::kED25519) {
     return Crypto::ED25519Sign(boost::algorithm::unhex(private_key), message);
   }
-  return Crypto::RSAPSSSign(engine, private_key, message);
+  return Crypto::RSAPSSSign(p11_key, private_key, message);
 }
 
 std::string Crypto::ED25519Sign(const std::string &private_key, const std::string &message) {
