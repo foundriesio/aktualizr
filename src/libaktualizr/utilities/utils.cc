@@ -32,6 +32,7 @@
 #include <boost/uuid/uuid_io.hpp>
 
 #include "aktualizr_version.h"
+#include "crypto/openssl_compat.h"
 #include "logging/logging.h"
 
 static const std::array<const char *, 132> adverbs = {
@@ -820,10 +821,15 @@ CURL *Utils::curlDupHandleWrapper(CURL *const curl_in, const bool using_pkcs11, 
   // This is a workaround for a bug in curl. It has been fixed in
   // 75a845d8cfa71688d59d43788c35829b25b6d6af (curl 7.61.1), but that is not
   // the default in most distributions yet, so we will continue to use the
-  // workaround.
+  // workaround. Only applies to the legacy ENGINE-based PKCS#11 path: on OpenSSL >= 4.0 curl
+  // dispatches "pkcs11:" URIs to the pkcs11-provider on its own, no ENGINE involved.
+#if !AKTUALIZR_OPENSSL_NO_ENGINE
   if (using_pkcs11) {
     curlEasySetoptWrapper(curl, CURLOPT_SSLENGINE, "pkcs11");
   }
+#else
+  (void)using_pkcs11;
+#endif
   if (share != nullptr) {
     curl_easy_setopt(curl, CURLOPT_SHARE, share);
   }
