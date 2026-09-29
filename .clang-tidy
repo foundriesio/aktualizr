@@ -19,7 +19,6 @@ Checks:          >-
   -performance-unnecessary-copy-initialization,-hicpp-use-emplace,-modernize-use-emplace,-cppcoreguidelines-virtual-class-destructor,-readability-simplify-boolean-expr,
 
 WarningsAsErrors: '*'
-AnalyzeTemporaryDtors: false
 CheckOptions:
   - key:             cert-dcl59-cpp.HeaderFileExtensions
     value:           h
