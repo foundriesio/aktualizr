@@ -76,6 +76,8 @@ class OstreeManager : public PackageManagerInterface {
 
  private:
   TargetStatus verifyTargetInternal(const Uptane::Target &target) const;
+  // Remove unused deployments and objects; a failure is only logged
+  static void cleanup(OstreeSysroot *sysroot);
 
   std::unique_ptr<Bootloader> bootloader_;
   std::string bootedStagedOstreeHash;
