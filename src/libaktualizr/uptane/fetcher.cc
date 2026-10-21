@@ -13,7 +13,8 @@ void Fetcher::fetchRole(std::string* result, int64_t maxsize, RepositoryType rep
   url += "/" + version.RoleFileName(role);
   HttpResponse response = http->get(url, maxsize);
   if (!response.isOk()) {
-    throw Uptane::MetadataFetchFailure(repo.ToString(), role.ToString());
+    throw Uptane::MetadataFetchFailure(repo.ToString(), role.ToString(), response.getStatusStr(),
+                                       static_cast<int>(response.http_status_code));
   }
   *result = response.body;
 }

@@ -19,8 +19,19 @@ class Exception : public std::logic_error {
 
 class MetadataFetchFailure : public Exception {
  public:
-  MetadataFetchFailure(const std::string& reponame, const std::string& role)
-      : Exception(reponame, std::string("Failed to fetch role ") + role + " in " + reponame + " repository.") {}
+  // reason: why the request failed, if known
+  MetadataFetchFailure(const std::string& reponame, const std::string& role, const std::string& reason = "",
+                       int http_status_code = 0)
+      : Exception(reponame, std::string("Failed to fetch role ") + role + " in " + reponame + " repository" +
+                                (reason.empty() ? "." : ": " + reason)),
+        http_status_code_(http_status_code) {}
+  // 0 if no HTTP response was received
+  int httpStatusCode() const { return http_status_code_; }
+  // The server refused the request, e.g. the device was deleted or denied
+  bool isAccessDenied() const { return http_status_code_ == 401 || http_status_code_ == 403; }
+
+ private:
+  int http_status_code_{0};
 };
 
 class SecurityException : public Exception {
