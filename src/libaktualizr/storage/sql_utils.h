@@ -152,6 +152,12 @@ class SQLite3Guard {
     sqlite3_busy_timeout(h, 2000);
 
     handle_.reset(h);
+
+    // In the default DELETE journal mode a commit completes when the journal is unlinked. With FULL that unlink is
+    // not synced, so a power loss shortly after a commit can roll it back; EXTRA syncs the directory after it.
+    if (!readonly && rc_ == SQLITE_OK && exec("PRAGMA synchronous = EXTRA;", nullptr, nullptr) != SQLITE_OK) {
+      LOG_WARNING << "Failed to set the SQLite synchronous mode to EXTRA: " << errmsg();
+    }
   }
 
   explicit SQLite3Guard(const boost::filesystem::path& path, bool readonly = false,
