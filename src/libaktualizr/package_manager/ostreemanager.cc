@@ -222,13 +222,19 @@ data::InstallationResult OstreeManager::install(const Uptane::Target &target) co
   }
   GObjectUniquePtr<OstreeDeployment> new_deployment = GObjectUniquePtr<OstreeDeployment>(new_deployment_raw);
 
+  // No cleanup here: once written, the new deployment is the next boot's, so a failed cleanup must not fail the install
   if (ostree_sysroot_simple_write_deployment(sysroot.get(), nullptr, new_deployment.get(), merge_deployment.get(),
-                                             OSTREE_SYSROOT_SIMPLE_WRITE_DEPLOYMENT_FLAGS_NONE, cancellable,
+                                             OSTREE_SYSROOT_SIMPLE_WRITE_DEPLOYMENT_FLAGS_NO_CLEAN, cancellable,
                                              &error) == 0) {
     LOG_ERROR << "ostree_sysroot_simple_write_deployment:" << error->message;
     data::InstallationResult install_res(data::ResultCode::Numeric::kInstallFailed, error->message);
     g_error_free(error);
     return install_res;
+  }
+
+  // Redeploying the booted Target, e.g. on a rollback, gets no finalization to clean up after it
+  if (target.sha256Hash() == getCurrentHash()) {
+    cleanup(sysroot.get());
   }
 
   // set reboot flag to be notified later
@@ -268,10 +274,22 @@ data::InstallationResult OstreeManager::finalizeInstall(const Uptane::Target &ta
     LOG_ERROR << "Expected to boot " << target.sha256Hash() << " but found " << current_hash
               << ". The system may have been rolled back.";
     install_result = data::InstallationResult(data::ResultCode::Numeric::kInstallFailed, "Wrong version booted");
+  } else {
+    cleanup(OstreeManager::LoadSysroot(config.sysroot).get());
   }
 
   bootloader_->rebootFlagClear();
   return install_result;
+}
+
+void OstreeManager::cleanup(OstreeSysroot *sysroot) {
+  GError *error = nullptr;
+  if (ostree_sysroot_cleanup(sysroot, nullptr, &error) == 0) {
+    // The deployments are already written, only the removal of unused files and objects failed
+    LOG_WARNING << "Failed to clean up the OSTree sysroot, unused objects are kept until a cleanup succeeds: "
+                << error->message;
+    g_error_free(error);
+  }
 }
 
 void OstreeManager::updateNotify() { bootloader_->updateNotify(); }
