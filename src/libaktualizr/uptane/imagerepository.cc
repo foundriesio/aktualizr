@@ -274,7 +274,9 @@ void ImageRepository::updateMeta(INvStorage& storage, const IMetadataFetcher& fe
       } catch (const Uptane::Exception& e) {
         LOG_ERROR << "Image repo Snapshot verification failed: " << e.what();
       }
-      local_version = snapshot.version();
+      // Rollback floor from the stored Snapshot; the `snapshot` member is only
+      // set when the verification above succeeded, otherwise it stays at -1.
+      local_version = extractVersionUntrusted(image_snapshot_stored);
     } else {
       local_version = -1;
     }
@@ -309,9 +311,9 @@ void ImageRepository::updateMeta(INvStorage& storage, const IMetadataFetcher& fe
       } catch (const std::exception& e) {
         LOG_ERROR << "Image repo Target verification failed: " << e.what();
       }
-      if (targets) {
-        local_version = targets->version();
-      }
+      // Rollback floor from the stored Targets; the `targets` member is only
+      // set when the verification above succeeded, otherwise it stays null.
+      local_version = extractVersionUntrusted(image_targets_stored);
     }
 
     // If we don't, attempt to fetch the latest.
