@@ -146,6 +146,9 @@ void HttpClient::setCerts(const std::string& ca, CryptoSource ca_source, const s
   std::unique_ptr<TemporaryFile> tmp_ca_file = std_::make_unique<TemporaryFile>("tls-ca");
   tmp_ca_file->PutContents(ca);
   curlEasySetoptWrapper(curl, CURLOPT_CAINFO, tmp_ca_file->Path().c_str());
+  // Pin verification to this CA only; the constructor set CURLOPT_CAPATH to the
+  // system store, which would otherwise also be trusted.
+  curlEasySetoptWrapper(curl, CURLOPT_CAPATH, NULL);
   tls_ca_file = std::move_if_noexcept(tmp_ca_file);
 
   if (cert_source == CryptoSource::kPkcs11) {
