@@ -192,9 +192,19 @@ using base64_to_bin = boost::archive::iterators::transform_width<
     8, 6>;
 
 std::string Utils::fromBase64(std::string base64_string) {
-  std::ptrdiff_t paddingChars = std::count(base64_string.begin(), base64_string.end(), '=');
+  const std::ptrdiff_t paddingChars = std::count(base64_string.begin(), base64_string.end(), '=');
+  // '=' is only valid as up to two trailing padding characters; reject anything
+  // else so paddingChars cannot exceed the decoded length.
+  const auto last_data = base64_string.find_last_not_of("=\r\n\t ");
+  const auto first_pad = base64_string.find('=');
+  if (paddingChars > 2 || (first_pad != std::string::npos && last_data != std::string::npos && last_data > first_pad)) {
+    throw std::runtime_error("Invalid base64 padding");
+  }
   std::replace(base64_string.begin(), base64_string.end(), '=', 'A');
   std::string result(base64_to_bin(base64_string.begin()), base64_to_bin(base64_string.end()));
+  if (paddingChars > static_cast<std::ptrdiff_t>(result.size())) {
+    throw std::runtime_error("Invalid base64 padding");
+  }
   result.erase(result.end() - paddingChars, result.end());
   return result;
 }

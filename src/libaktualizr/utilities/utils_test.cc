@@ -135,7 +135,18 @@ TEST(Utils, FromBase64) {
 TEST(Utils, FromBase64Wrong) {
   EXPECT_THROW(Utils::fromBase64("Привіт"), boost::archive::iterators::dataflow_exception);
   EXPECT_THROW(Utils::fromBase64("aGVsbG8=="), boost::archive::iterators::dataflow_exception);
-  EXPECT_THROW(Utils::fromBase64("CQ==="), boost::archive::iterators::dataflow_exception);
+  EXPECT_THROW(Utils::fromBase64("CQ==="), std::exception);
+}
+
+TEST(Utils, FromBase64Padding) {
+  // '=' is only valid as trailing padding, at most two of them. These inputs
+  // decode to fewer bytes than their '=' count, which previously made
+  // fromBase64 erase past the start of the buffer; they must be rejected.
+  EXPECT_THROW(Utils::fromBase64(std::string(64, '=')), std::exception);
+  EXPECT_THROW(Utils::fromBase64("===="), std::exception);
+  EXPECT_THROW(Utils::fromBase64("=AAA"), std::exception);
+  EXPECT_THROW(Utils::fromBase64("AA=A"), std::exception);
+  EXPECT_THROW(Utils::fromBase64("=="), std::exception);
 }
 
 TEST(Utils, Base64RoundTrip) {
