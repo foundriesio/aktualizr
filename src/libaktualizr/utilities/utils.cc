@@ -192,9 +192,19 @@ using base64_to_bin = boost::archive::iterators::transform_width<
     8, 6>;
 
 std::string Utils::fromBase64(std::string base64_string) {
-  std::ptrdiff_t paddingChars = std::count(base64_string.begin(), base64_string.end(), '=');
+  const std::ptrdiff_t paddingChars = std::count(base64_string.begin(), base64_string.end(), '=');
+  // '=' is only valid as up to two trailing padding characters.
+  if (paddingChars > 2 || base64_string.find_first_not_of('=', base64_string.find('=')) != std::string::npos) {
+    throw boost::archive::iterators::dataflow_exception(
+        boost::archive::iterators::dataflow_exception::invalid_base64_character);
+  }
   std::replace(base64_string.begin(), base64_string.end(), '=', 'A');
   std::string result(base64_to_bin(base64_string.begin()), base64_to_bin(base64_string.end()));
+  // Guard the erase: padding must not exceed the decoded length (e.g. "==" decodes to one byte).
+  if (paddingChars > static_cast<std::ptrdiff_t>(result.size())) {
+    throw boost::archive::iterators::dataflow_exception(
+        boost::archive::iterators::dataflow_exception::invalid_base64_character);
+  }
   result.erase(result.end() - paddingChars, result.end());
   return result;
 }
