@@ -22,8 +22,11 @@
 #include "storage/fsstorage_read.h"
 #include "storage/invstorage.h"
 #include "test_utils.h"
+#include "uptane/fetcher.h"
+#include "uptane/imagerepository.h"
 #include "uptane/tuf.h"
 #include "uptane/uptanerepository.h"
+#include "uptane_repo.h"
 #include "uptane_test_common.h"
 #include "utilities/utils.h"
 
@@ -1416,6 +1419,51 @@ TEST(Uptane, Pkcs11Provision) {
   ExpectProvisionOK(Provisioner(config.provision, storage, http, keys, {}));
 }
 #endif
+
+/*
+ * Reject Image repo Snapshot and Targets metadata that is older than the stored one,
+ * even if it comes with a newer, validly signed Timestamp.
+ */
+TEST(Uptane, ImageRepoRollback) {
+  TemporaryDirectory temp_dir;
+  const boost::filesystem::path repo_dir = temp_dir.Path() / "repo/repo";
+  UptaneRepo repo(temp_dir.Path(), "", "");
+  repo.generateRepo();
+  const std::string snapshot_v1 = Utils::readFile(repo_dir / "snapshot.json");
+  const std::string targets_v1 = Utils::readFile(repo_dir / "targets.json");
+  // Bump Targets, Snapshot and Timestamp to version 3.
+  repo.refresh(Uptane::RepositoryType::Image(), Uptane::Role::Targets());
+  repo.refresh(Uptane::RepositoryType::Image(), Uptane::Role::Targets());
+
+  auto http = std::make_shared<HttpFake>(temp_dir.Path(), "", temp_dir.Path() / "repo");
+  Uptane::Fetcher fetcher(http->tls_server + "/repo", http->tls_server + "/director", http);
+  StorageConfig storage_config;
+  storage_config.path = temp_dir.Path() / "storage";
+  auto storage = INvStorage::newStorage(storage_config);
+
+  Uptane::ImageRepository image_repo;
+  EXPECT_NO_THROW(image_repo.updateMeta(*storage, fetcher));
+
+  // Serve Targets v1 under a newer Timestamp (v5) and Snapshot (v4).
+  Utils::writeFile(repo_dir / "targets.json", targets_v1);
+  repo.refresh(Uptane::RepositoryType::Image(), Uptane::Role::Timestamp());
+  try {
+    image_repo.updateMeta(*storage, fetcher);
+    FAIL() << "Rollback is not detected";
+  } catch (const Uptane::SecurityException &exc) {
+    EXPECT_STREQ(exc.what(), "Rollback attempt");
+  }
+
+  // Serve Snapshot v2 under a newer Timestamp (v7); the stored Snapshot is v4.
+  Utils::writeFile(repo_dir / "snapshot.json", snapshot_v1);
+  repo.refresh(Uptane::RepositoryType::Image(), Uptane::Role::Timestamp());
+  try {
+    image_repo.updateMeta(*storage, fetcher);
+    FAIL() << "Rollback is not detected";
+  } catch (const Uptane::SecurityException &exc) {
+    EXPECT_STREQ(exc.what(), "Rollback attempt");
+  }
+}
 
 #ifndef __NO_MAIN__
 int main(int argc, char **argv) {
