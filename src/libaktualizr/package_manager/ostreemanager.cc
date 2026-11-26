@@ -123,8 +123,19 @@ data::InstallationResult OstreeManager::pull(const boost::filesystem::path &sysr
     }
   }
 
+  const char *pull_remote = alt_remote == nullptr ? remote : alt_remote;
+
+  // A local (file://) source is not covered by the signed metadata, so verify
+  // the checksum of every imported object instead of trusting it.
+  OstreeRepoPullFlags pull_flags = OSTREE_REPO_PULL_FLAGS_NONE;
+  g_autofree char *remote_url = nullptr;
+  if (ostree_repo_remote_get_url(repo.get(), pull_remote, &remote_url, nullptr) != 0 && remote_url != nullptr &&
+      std::string(remote_url).rfind("file://", 0) == 0) {
+    pull_flags = OSTREE_REPO_PULL_FLAGS_UNTRUSTED;
+  }
+
   g_variant_builder_init(&builder, G_VARIANT_TYPE("a{sv}"));
-  g_variant_builder_add(&builder, "{s@v}", "flags", g_variant_new_variant(g_variant_new_int32(0)));
+  g_variant_builder_add(&builder, "{s@v}", "flags", g_variant_new_variant(g_variant_new_int32(pull_flags)));
 
   g_variant_builder_add(&builder, "{s@v}", "refs", g_variant_new_variant(g_variant_new_strv(commit_ids, 1)));
 
@@ -143,8 +154,8 @@ data::InstallationResult OstreeManager::pull(const boost::filesystem::path &sysr
 
   PullMetaStruct mt(target, token, g_cancellable_new(), std::move(progress_cb));
   progress.reset(ostree_async_progress_new_and_connect(aktualizr_progress_cb, &mt));
-  if (ostree_repo_pull_with_options(repo.get(), alt_remote == nullptr ? remote : alt_remote, options, progress.get(),
-                                    mt.cancellable.get(), &error) == 0) {
+  if (ostree_repo_pull_with_options(repo.get(), pull_remote, options, progress.get(), mt.cancellable.get(), &error) ==
+      0) {
     LOG_ERROR << "Error while pulling image: " << error->code << " " << error->message;
     data::InstallationResult install_res(data::ResultCode::Numeric::kInstallFailed, error->message);
     g_error_free(error);
